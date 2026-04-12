@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+require "fileutils"
+require "xcodeproj"
+
+ROOT = File.expand_path("..", __dir__)
+PROJECT_PATH = File.join(ROOT, "Aileen4DisasterRelief.xcodeproj")
+DEVELOPMENT_TEAM = "FSYXWNUDDW"
+BUNDLE_ID = "com.ndurner.Aileen4DisasterRelief"
+
+FileUtils.rm_rf(PROJECT_PATH)
+project = Xcodeproj::Project.new(PROJECT_PATH)
+
+app_target = project.new_target(:application, "Aileen4DisasterRelief", :ios, "17.0")
+app_target.product_reference.name = "Aileen4DisasterRelief.app"
+
+project.root_object.attributes["TargetAttributes"] ||= {}
+project.root_object.attributes["TargetAttributes"][app_target.uuid] = {
+  "ProvisioningStyle" => "Automatic",
+  "DevelopmentTeam" => DEVELOPMENT_TEAM
+}
+
+main_group = project.main_group
+app_group = main_group.new_group("Aileen4DisasterRelief", "Aileen4DisasterRelief")
+resources_group = app_group.new_group("Resources", "Aileen4DisasterRelief/Resources")
+support_group = app_group.new_group("Support", "Aileen4DisasterRelief/Support")
+sources_group = main_group.new_group("Sources", "Aileen4DisasterRelief/Sources")
+appmodule_group = sources_group.new_group("AppModule", "AppModule")
+bridge_group = sources_group.new_group("LiteRTLMBridge", "LiteRTLMBridge")
+
+[
+  "Aileen4DisasterReliefApp.swift",
+  "AppState.swift",
+  "ContentView.swift",
+  "BackgroundBriefingView.swift",
+  "ContentProductionView.swift",
+  "SettingsView.swift",
+  "ModelCatalog.swift",
+  "MediaAsset.swift",
+  "ProductionWorkflowViewModel.swift",
+  "LiteRTResponseParser.swift",
+  "GemmaTextRunner.swift",
+  "GemmaToolCallingEngine.swift",
+  "FFmpegTooling.swift",
+  "ShareSheet.swift"
+].each do |filename|
+  reference = appmodule_group.new_file("Aileen4DisasterRelief/Sources/AppModule/#{filename}")
+  reference.source_tree = "SOURCE_ROOT"
+  app_target.add_file_references([reference])
+end
+
+bridge_ref = bridge_group.new_file("Aileen4DisasterRelief/Sources/LiteRTLMBridge/LiteRTLMBridge.mm")
+bridge_ref.source_tree = "SOURCE_ROOT"
+app_target.add_file_references([bridge_ref])
+
+bridging_header_ref = support_group.new_file("Aileen4DisasterRelief/Support/Aileen4DisasterRelief-Bridging-Header.h")
+bridging_header_ref.source_tree = "SOURCE_ROOT"
+
+asset_ref = resources_group.new_file("Aileen4DisasterRelief/Resources/Assets.xcassets")
+asset_ref.source_tree = "SOURCE_ROOT"
+app_target.resources_build_phase.add_file_reference(asset_ref)
+
+vendor_group = main_group.new_group("ThirdParty", "ThirdParty/GoogleAIEdge")
+litert_ref = vendor_group.new_file("ThirdParty/GoogleAIEdge/LiteRTLM.xcframework")
+constraint_ref = vendor_group.new_file("ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework")
+metal_ref = vendor_group.new_file("ThirdParty/GoogleAIEdge/LiteRtMetalAccelerator.xcframework")
+[litert_ref, constraint_ref, metal_ref].each { |ref| ref.source_tree = "SOURCE_ROOT" }
+
+app_target.frameworks_build_phase.add_file_reference(litert_ref)
+app_target.frameworks_build_phase.add_file_reference(constraint_ref)
+app_target.frameworks_build_phase.add_file_reference(metal_ref)
+
+embed_phase = project.new(Xcodeproj::Project::Object::PBXCopyFilesBuildPhase)
+embed_phase.name = "Embed Frameworks"
+embed_phase.symbol_dst_subfolder_spec = :frameworks
+app_target.build_phases << embed_phase
+[
+  embed_phase.add_file_reference(constraint_ref, true),
+  embed_phase.add_file_reference(metal_ref, true)
+].each do |build_file|
+  build_file.settings = {
+    "ATTRIBUTES" => ["CodeSignOnCopy", "RemoveHeadersOnCopy"]
+  }
+end
+
+app_target.build_configurations.each do |config|
+  config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = BUNDLE_ID
+  config.build_settings["SWIFT_VERSION"] = "6.0"
+  config.build_settings["CODE_SIGN_STYLE"] = "Automatic"
+  config.build_settings["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
+  config.build_settings["CODE_SIGN_IDENTITY"] = "Apple Development"
+  config.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
+  config.build_settings["INFOPLIST_KEY_UIApplicationSceneManifest_Generation"] = "YES"
+  config.build_settings["INFOPLIST_KEY_UILaunchScreen_Generation"] = "YES"
+  config.build_settings["INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone"] = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+  config.build_settings["INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad"] = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+  config.build_settings["INFOPLIST_KEY_NSPhotoLibraryUsageDescription"] = "Select disaster-relief media assets."
+  config.build_settings["INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"] = "YES"
+  config.build_settings["INFOPLIST_KEY_UIFileSharingEnabled"] = "YES"
+  config.build_settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = "AppIcon"
+  config.build_settings["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME"] = "AccentColor"
+  config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "17.0"
+  config.build_settings["TARGETED_DEVICE_FAMILY"] = "1,2"
+  config.build_settings["SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD"] = "YES"
+  config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "x86_64"
+  config.build_settings["ENABLE_USER_SCRIPT_SANDBOXING"] = "NO"
+  config.build_settings["SWIFT_OBJC_BRIDGING_HEADER"] = "Aileen4DisasterRelief/Support/Aileen4DisasterRelief-Bridging-Header.h"
+  config.build_settings["CLANG_CXX_LANGUAGE_STANDARD"] = "gnu++20"
+  config.build_settings["GCC_PREPROCESSOR_DEFINITIONS"] = ["$(inherited)", "GEMMA_LITERTLM_LINKED=1"]
+  config.build_settings["OTHER_LDFLAGS"] = ["$(inherited)"]
+  config.build_settings["OTHER_LDFLAGS[sdk=iphoneos*]"] = [
+    "$(inherited)",
+    "-force_load",
+    "$(PROJECT_DIR)/ThirdParty/GoogleAIEdge/LiteRTLM.xcframework/ios-arm64/LiteRTLM.framework/LiteRTLM"
+  ]
+  config.build_settings["OTHER_LDFLAGS[sdk=iphonesimulator*]"] = [
+    "$(inherited)",
+    "-force_load",
+    "$(PROJECT_DIR)/ThirdParty/GoogleAIEdge/LiteRTLM.xcframework/ios-arm64-simulator/LiteRTLM.framework/LiteRTLM"
+  ]
+  config.build_settings["LD_RUNPATH_SEARCH_PATHS"] = ["$(inherited)", "@executable_path/Frameworks"]
+end
+
+project.save

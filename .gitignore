@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Xcode / Swift build products
+DerivedData/
+**/.build/
+**/xcuserdata/
+**/*.xcuserstate
+**/*.moved-aside
+**/*.xccheckout
+**/*.xcscmblueprint
+
+# SwiftPM / package resolution noise
+**/.swiftpm/
+**/Package.resolved
+
+# Editor / tooling
+.idea/
+.vscode/
+
+# Python helpers
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+
+# Local models and large generated media
+.model-cache-stash/
+apps/apple/ImportedAssets/
+apps/apple/Aileen4DisasterRelief/Resources/Generated/
+apps/apple/.build/AileenOutputs/
+apps/apple/ThirdParty/GoogleAIEdge/*
+!apps/apple/ThirdParty/GoogleAIEdge/README.md
+
+# Runtime logs
+*.log
+
+apps/apple/build

@@ -1,0 +1,137 @@
+import PhotosUI
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct ContentProductionView: View {
+    @EnvironmentObject private var appState: AppState
+    @StateObject private var viewModel = ProductionWorkflowViewModel()
+    @State private var fileImporterPresented = false
+    @State private var shareSheetPresented = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Inputs") {
+                    Picker("Visual model", selection: $appState.selectedProductionModel) {
+                        ForEach(ModelOption.allCases) { model in
+                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
+                        }
+                    }
+
+                    Picker("Caption model", selection: $appState.selectedTextModel) {
+                        ForEach(ModelOption.allCases) { model in
+                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
+                        }
+                    }
+
+                    Picker("Output", selection: $viewModel.outputKind) {
+                        Text("Image").tag(ProductionWorkflowViewModel.OutputKind.image)
+                        Text("Reel").tag(ProductionWorkflowViewModel.OutputKind.reel)
+                    }
+                    .pickerStyle(.segmented)
+
+                    TextField("Story", text: $appState.story, axis: .vertical)
+                        .lineLimit(4...8)
+
+                    PhotosPicker(
+                        selection: $viewModel.selectedPhotoItems,
+                        maxSelectionCount: 10,
+                        matching: .any(of: [.images, .videos])
+                    ) {
+                        Label("Add from Camera Roll", systemImage: "photo.on.rectangle")
+                    }
+
+                    Button("Add from Files") {
+                        fileImporterPresented = true
+                    }
+                }
+
+                if !viewModel.assets.isEmpty {
+                    Section("Media assets") {
+                        ForEach(viewModel.assets) { asset in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(asset.displayName)
+                                Text(asset.localCopyURL.path)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                Section("Production") {
+                    Button(viewModel.isRunning ? "Producing..." : "Produce visuals + caption") {
+                        Task {
+                            await viewModel.run(
+                                backgroundBriefing: appState.backgroundBriefing,
+                                story: appState.story,
+                                visualModel: appState.selectedProductionModel,
+                                textModel: appState.selectedTextModel,
+                                modelSource: appState.preferredModelSource,
+                                ffmpegExecutablePath: appState.ffmpegExecutablePath
+                            )
+                        }
+                    }
+                    .disabled(viewModel.isRunning)
+                }
+
+                if !viewModel.executedToolCalls.isEmpty {
+                    Section("Tool calls") {
+                        ForEach(viewModel.executedToolCalls) { toolCall in
+                            Text(verbatim: "\(toolCall.name) \(toolCall.arguments)")
+                                .font(.footnote.monospaced())
+                        }
+                    }
+                }
+
+                if !viewModel.productionSummary.isEmpty {
+                    Section("Visual production summary") {
+                        Text(viewModel.productionSummary)
+                    }
+                }
+
+                if !viewModel.captionText.isEmpty {
+                    Section("Caption") {
+                        Text(viewModel.captionText)
+                        Button("Share results") {
+                            shareSheetPresented = true
+                        }
+                    }
+                }
+
+                if let latestError = viewModel.latestError {
+                    Section("Error") {
+                        Text(latestError)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Content production")
+            .task(id: viewModel.selectedPhotoItems) {
+                guard !viewModel.selectedPhotoItems.isEmpty else { return }
+                await viewModel.ingestPhotos()
+            }
+            .fileImporter(
+                isPresented: $fileImporterPresented,
+                allowedContentTypes: [.image, .movie],
+                allowsMultipleSelection: true
+            ) { result in
+                do {
+                    let urls = try result.get()
+                    for url in urls {
+                        let accessing = url.startAccessingSecurityScopedResource()
+                        defer {
+                            if accessing { url.stopAccessingSecurityScopedResource() }
+                        }
+                        try viewModel.appendImportedFile(url)
+                    }
+                } catch {
+                    viewModel.latestError = error.localizedDescription
+                }
+            }
+            .sheet(isPresented: $shareSheetPresented) {
+                ShareSheet(items: viewModel.shareItems)
+            }
+        }
+    }
+}
