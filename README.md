@@ -85,6 +85,18 @@ Supported local development routes:
 - device injection into the app container
 - manual import of `.litertlm` model files through the app
 
+Pinned download URLs:
+
+- E2B: `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm`
+- E4B `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/afca9a55ba2848faee6588e46b47c3164411a903/gemma-4-E4B-it.litertlm`
+
+Reference model pages:
+
+- E2B: `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm`
+- E4B: `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm`
+
+(see chapter "Development" on how to inject model files into the app container)
+
 The intended direction is to prefer official Google-distributed artifacts and
 reproducible generation from official sources over opaque local binaries.
 
@@ -122,8 +134,75 @@ Inject models onto a device:
 
 ```bash
 cd apps/apple
-scripts/shared/inject_models_to_device.sh <device-id> com.ndurner.Aileen4DisasterRelief <model-path> [<model-path> ...]
+scripts/shared/inject_models_to_device.sh <device-id> <bundle-id> <model-path> [<model-path> ...]
 ```
+
+Concrete examples:
+
+1. Real iPhone or iPad, starting from a manually downloaded model file:
+
+```bash
+mkdir -p .model-cache-stash
+curl -L \
+  https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm \
+  -o .model-cache-stash/gemma-4-E2B-it.litertlm
+
+cd apps/apple
+xcrun devicectl list devices
+scripts/shared/inject_models_to_device.sh \
+  6E4F1B88-F27A-5989-888C-F1781C359B9B \
+  de.ndurner.Aileen4DisasterRelief \
+  ../../.model-cache-stash/gemma-4-E2B-it.litertlm
+```
+
+This copies the file inside that app's sandbox on the physical device.
+
+2. Real iPhone or iPad, using the larger Gemma 4 option:
+
+```bash
+mkdir -p .model-cache-stash
+curl -L \
+  https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/afca9a55ba2848faee6588e46b47c3164411a903/gemma-4-E4B-it.litertlm \
+  -o .model-cache-stash/gemma-4-E4B-it.litertlm
+
+cd apps/apple
+scripts/shared/inject_models_to_device.sh \
+  6E4F1B88-F27A-5989-888C-F1781C359B9B \
+  de.ndurner.Aileen4DisasterRelief \
+  ../../.model-cache-stash/gemma-4-E4B-it.litertlm
+```
+
+Re-running the same command is cheap because the script compares a generated
+manifest and prints `Reusing injected ...` when nothing changed.
+
+3. Mac app running the Designed-for-iPad target:
+
+Launch the app once from Xcode first, then copy the model into the live app
+container.
+
+Do not assume the container path is always:
+
+- `~/Library/Containers/de.ndurner.Aileen4DisasterRelief/Data`
+
+For Xcode-launched Designed-for-iPad builds, the running app may instead use a
+UUID-named container under `~/Library/Containers/`. The reliable approach is to
+read the active process `HOME` and copy into that sandbox.
+
+```bash
+mkdir -p .model-cache-stash
+curl -L \
+  https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm \
+  -o .model-cache-stash/gemma-4-E2B-it.litertlm
+
+APP_PID="$(ps aux | awk '/[A]ileen4DisasterRelief.app\/Aileen4DisasterRelief/{print $2; exit}')"
+APP_HOME="$(ps eww -p "$APP_PID" | tr ' ' '\n' | sed -n 's/^HOME=//p' | head -n1)"
+
+mkdir -p "$APP_HOME/Library/Application Support/Models"
+cp .model-cache-stash/gemma-4-E2B-it.litertlm \
+  "$APP_HOME/Library/Application Support/Models/"
+```
+
+Restart the app if it was already running so it re-reads the container contents.
 
 ## Notes
 
