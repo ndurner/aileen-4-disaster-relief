@@ -175,6 +175,7 @@ final class AppleMediaTooling {
             canvasSize: asset.canvasSize,
             preferredImageFileType: asset.preferredImageFileType
         )
+        assets[assetID] = renderedAsset
         return MediaToolResult(
             name: "add_text_overlay",
             payload: [

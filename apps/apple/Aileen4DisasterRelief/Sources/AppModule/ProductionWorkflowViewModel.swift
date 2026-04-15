@@ -237,9 +237,17 @@ enum ProductionPrompts {
         Valid source asset IDs:
         \(validSourceIDs.isEmpty ? "(none selected)" : validSourceIDs)
 
+        Treat the background briefing as brand voice, audience, and editorial constraints, not as story facts.
+        Ground every concrete claim in the story text or the attached media.
+        Do not mention animals, people, events, needs, diagnoses, or calls to action unless they are supported by the story or visible media.
+        If the story is sparse, obviously a test, or non-descriptive, keep the result correspondingly generic and testing-oriented instead of inventing subject matter.
+        Match every overlay to what is visibly in frame. Do not write as if the media shows something it does not show.
         Use only those exact asset IDs in tool calls. Never use file paths, filenames, display names, UUIDs, or guessed IDs.
         First call compose_visuals with one or more source asset IDs.
-        Then, if needed, call add_text_overlay on the returned rendered asset ID.
+        Then, only if the media clearly benefits from it, call add_text_overlay on the returned rendered asset ID.
+        Use as many overlays as needed when they clearly improve the result, but keep each overlay purposeful and compact.
+        Keep overlay text short enough to read comfortably on mobile.
+        If you call add_text_overlay more than once, always use the most recently returned rendered asset ID so overlays accumulate correctly.
         x, y, width, and height are pixel values in the output canvas.
         Keep tool responses concise and produce a publication-ready result.
         """
@@ -257,7 +265,13 @@ enum ProductionPrompts {
         Visual output summary:
         \(producedVisualSummary.isEmpty ? "(none produced)" : producedVisualSummary)
 
+        Treat the background briefing as style and constraints, not as factual post content.
+        Use only facts supported by the story text, visible media, or visual output summary.
+        If the story is sparse, obviously a test, or non-descriptive, keep the post body short and testing-oriented instead of inventing specific subject matter.
         Keep it publication-ready and concise.
+        Prefer 1 to 3 short paragraphs or lines.
+        Use at most 3 relevant hashtags, and only when they add value.
+        Add a CTA only when the provided inputs clearly support one.
         """
     }
 }
