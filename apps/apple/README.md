@@ -11,7 +11,7 @@ Current focus:
 - persistent background briefing
 - content-production workflow with imported media assets
 - local Gemma 4 LiteRT model management
-- tool-calling orchestration for media-production tasks
+- on-device Apple-native media tool-calling orchestration
 - shareable visual and text outputs
 
 Open the Xcode project:

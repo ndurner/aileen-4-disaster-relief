@@ -6,31 +6,43 @@ struct ToolExecutionResult {
     let producedURLs: [URL]
 }
 
+struct ProductionAssetDescriptor: Identifiable {
+    let toolID: String
+    let mediaAsset: MediaAsset
+
+    var id: String { toolID }
+    var promptSummary: String { "\(toolID): \(mediaAsset.kind.rawValue) source asset" }
+}
+
 actor GemmaToolCallingEngine {
     private let runner = GemmaTextRunner()
 
-    func run(initialPrompt: String, modelURL: URL, ffmpegExecutablePath: String) async throws -> ToolExecutionResult {
+    func run(initialPrompt: String, modelURL: URL, sourceAssets: [ProductionAssetDescriptor], outputKind: ProductionWorkflowViewModel.OutputKind) async throws -> ToolExecutionResult {
         try await runner.makeToolSession(modelURL: modelURL, toolsJSON: ProductionToolSchema.toolsJSON)
         defer { Task { await runner.destroySession() } }
+        let tooling = AppleMediaTooling(sourceAssets: sourceAssets, outputKind: outputKind)
 
         let initialMessage = ProductionToolSchema.userMessageJSON(text: initialPrompt)
         var parsed = try await runner.sendJSON(initialMessage)
         var seenCalls: [LiteRTToolCall] = []
-        var producedURLs: [URL] = []
+        var latestProducedURL: URL?
 
         while !parsed.toolCalls.isEmpty {
             seenCalls.append(contentsOf: parsed.toolCalls)
-            let responses = try parsed.toolCalls.map { try execute(toolCall: $0, ffmpegExecutablePath: ffmpegExecutablePath) }
-            producedURLs.append(contentsOf: responses.compactMap(\.outputURL))
+            var responses: [MediaToolResult] = []
+            for toolCall in parsed.toolCalls {
+                responses.append(try await tooling.execute(toolCall: toolCall))
+            }
+            latestProducedURL = responses.compactMap(\.outputURL).last ?? latestProducedURL
             let responseMessage = try ProductionToolSchema.toolResponseJSON(for: responses)
             parsed = try await runner.sendJSON(responseMessage)
         }
 
-        return ToolExecutionResult(toolCalls: seenCalls, finalText: parsed.text, producedURLs: producedURLs)
-    }
-
-    private func execute(toolCall: LiteRTToolCall, ffmpegExecutablePath: String) throws -> FFmpegToolResult {
-        try FFmpegTooling().execute(toolCall: toolCall, ffmpegExecutablePath: ffmpegExecutablePath)
+        return ToolExecutionResult(
+            toolCalls: seenCalls,
+            finalText: parsed.text,
+            producedURLs: latestProducedURL.map { [$0] } ?? []
+        )
     }
 }
 
@@ -41,34 +53,32 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "compose_visuals",
-          "description": "Create a still image montage or a reel from local media assets.",
+          "description": "Create the base visual from one or more exact source asset IDs such as asset_1. Use only the listed asset IDs, never file paths, filenames, or UUIDs. The app determines whether the result is a still image or a reel from its current output mode.",
           "parameters": {
             "type": "object",
             "properties": {
-              "mode": { "type": "string", "enum": ["image", "reel"] },
-              "asset_paths": { "type": "array", "items": { "type": "string" } },
-              "overlay_text": { "type": "string" }
+              "asset_ids": { "type": "array", "items": { "type": "string" } }
             },
-            "required": ["mode", "asset_paths"]
+            "required": ["asset_ids"]
           }
         }
       },
       {
         "type": "function",
         "function": {
-          "name": "add_overlay_rectangles",
-          "description": "Draw text boxes or emphasis rectangles on an existing visual.",
+          "name": "add_text_overlay",
+          "description": "Draw a text box with background rectangle on an existing rendered asset such as rendered_1. Use only exact returned asset IDs.",
           "parameters": {
             "type": "object",
             "properties": {
-              "input_path": { "type": "string" },
+              "asset_id": { "type": "string" },
               "overlay_text": { "type": "string" },
               "x": { "type": "integer" },
               "y": { "type": "integer" },
               "width": { "type": "integer" },
               "height": { "type": "integer" }
             },
-            "required": ["input_path", "overlay_text"]
+            "required": ["asset_id", "overlay_text", "x", "y", "width", "height"]
           }
         }
       }
@@ -83,7 +93,7 @@ enum ProductionToolSchema {
         return stringify(message)
     }
 
-    static func toolResponseJSON(for results: [FFmpegToolResult]) throws -> String {
+    static func toolResponseJSON(for results: [MediaToolResult]) throws -> String {
         let content: [[String: Any]] = results.map { result in
             [
                 "type": "tool_response",

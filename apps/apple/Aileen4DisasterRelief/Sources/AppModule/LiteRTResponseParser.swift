@@ -51,6 +51,11 @@ enum LiteRTToolValue: Hashable, CustomStringConvertible {
         }
         return nil
     }
+
+    var numberValue: Double? {
+        if case .number(let value) = self { return value }
+        return nil
+    }
 }
 
 struct LiteRTToolCall: Identifiable {

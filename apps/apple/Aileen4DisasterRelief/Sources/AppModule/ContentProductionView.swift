@@ -36,7 +36,8 @@ struct ContentProductionView: View {
                     PhotosPicker(
                         selection: $viewModel.selectedPhotoItems,
                         maxSelectionCount: 10,
-                        matching: .any(of: [.images, .videos])
+                        matching: .any(of: [.images, .videos]),
+                        preferredItemEncoding: .current
                     ) {
                         Label("Add from Camera Roll", systemImage: "photo.on.rectangle")
                     }
@@ -51,7 +52,7 @@ struct ContentProductionView: View {
                         ForEach(viewModel.assets) { asset in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(asset.displayName)
-                                Text(asset.localCopyURL.path)
+                                Text(asset.kind == .image ? "Image asset" : "Video asset")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
@@ -67,8 +68,7 @@ struct ContentProductionView: View {
                                 story: appState.story,
                                 visualModel: appState.selectedProductionModel,
                                 textModel: appState.selectedTextModel,
-                                modelSource: appState.preferredModelSource,
-                                ffmpegExecutablePath: appState.ffmpegExecutablePath
+                                modelSource: appState.preferredModelSource
                             )
                         }
                     }
@@ -93,8 +93,12 @@ struct ContentProductionView: View {
                 if !viewModel.captionText.isEmpty {
                     Section("Caption") {
                         Text(viewModel.captionText)
-                        Button("Share results") {
-                            shareSheetPresented = true
+                        Button(ProcessInfo.processInfo.isiOSAppOnMac ? "Export results" : "Share results") {
+                            if ProcessInfo.processInfo.isiOSAppOnMac {
+                                viewModel.openExportDirectory()
+                            } else {
+                                shareSheetPresented = true
+                            }
                         }
                     }
                 }
@@ -123,7 +127,7 @@ struct ContentProductionView: View {
                         defer {
                             if accessing { url.stopAccessingSecurityScopedResource() }
                         }
-                        try viewModel.appendImportedFile(url)
+                        try viewModel.appendImportedFile(url, displayName: viewModel.importedFileDisplayName(for: url))
                     }
                 } catch {
                     viewModel.latestError = error.localizedDescription

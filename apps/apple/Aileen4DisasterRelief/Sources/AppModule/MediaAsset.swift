@@ -22,10 +22,6 @@ struct MediaAsset: Identifiable, Hashable {
         self.displayName = displayName
     }
 
-    var promptSummary: String {
-        "\(kind == .image ? "image" : "movie"): \(displayName)"
-    }
-
     static func kind(for url: URL) -> Kind {
         if let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .movie) {
             return .movie

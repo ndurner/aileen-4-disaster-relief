@@ -18,10 +18,6 @@ final class AppState: ObservableObject {
         didSet { defaults.set(selectedTextModel.rawValue, forKey: Keys.selectedTextModel) }
     }
 
-    @Published var ffmpegExecutablePath: String {
-        didSet { defaults.set(ffmpegExecutablePath, forKey: Keys.ffmpegExecutablePath) }
-    }
-
     @Published var preferredModelSource: ModelSourcePreference {
         didSet { defaults.set(preferredModelSource.rawValue, forKey: Keys.preferredModelSource) }
     }
@@ -34,7 +30,6 @@ final class AppState: ObservableObject {
         story = defaults.string(forKey: Keys.story) ?? ""
         selectedProductionModel = ModelOption(rawValue: defaults.string(forKey: Keys.selectedProductionModel) ?? "") ?? .e2bLiteRT
         selectedTextModel = ModelOption(rawValue: defaults.string(forKey: Keys.selectedTextModel) ?? "") ?? .e4bLiteRT
-        ffmpegExecutablePath = defaults.string(forKey: Keys.ffmpegExecutablePath) ?? "/usr/local/bin/ffmpeg"
         preferredModelSource = ModelSourcePreference(rawValue: defaults.string(forKey: Keys.preferredModelSource) ?? "") ?? .injected
     }
 
@@ -43,7 +38,6 @@ final class AppState: ObservableObject {
         static let story = "story"
         static let selectedProductionModel = "selectedProductionModel"
         static let selectedTextModel = "selectedTextModel"
-        static let ffmpegExecutablePath = "ffmpegExecutablePath"
         static let preferredModelSource = "preferredModelSource"
     }
 }

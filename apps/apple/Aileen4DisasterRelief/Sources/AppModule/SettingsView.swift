@@ -39,11 +39,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("FFmpeg") {
-                    TextField("Executable path", text: $appState.ffmpegExecutablePath)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Text("Used when the tool-calling workflow emits FFmpeg assembly operations. On iPhone and iPad this is mainly a planning path until an embedded FFmpeg runtime is selected.")
+                Section("Media rendering") {
+                    Text("The app uses Apple-native media rendering for on-device image and reel assembly on iPhone, iPad, and Designed for iPad on Mac.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
