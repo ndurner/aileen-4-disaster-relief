@@ -36,7 +36,7 @@ enum ModelOption: String, CaseIterable, Identifiable {
         case .e2bLiteRT:
             return "Visual production"
         case .e4bLiteRT:
-            return "Caption generation"
+            return "Post body generation"
         }
     }
 }

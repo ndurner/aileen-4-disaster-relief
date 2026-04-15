@@ -19,7 +19,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
     @Published var outputKind: OutputKind = .image
     @Published var isRunning = false
     @Published var productionSummary = ""
-    @Published var captionText = ""
+    @Published var postBodyText = ""
     @Published var executedToolCalls: [LiteRTToolCall] = []
     @Published var producedURLs: [URL] = []
     @Published var shareItems: [Any] = []
@@ -28,7 +28,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
 
     private let locator = ModelLocator()
     private let toolEngine = GemmaToolCallingEngine()
-    private let captionRunner = GemmaTextRunner()
+    private let postBodyRunner = GemmaTextRunner()
     private var nextCameraRollAssetNumber = 1
     private var nextImportedFileNumber = 1
 
@@ -71,7 +71,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
         isRunning = true
         latestError = nil
         productionSummary = ""
-        captionText = ""
+        postBodyText = ""
         executedToolCalls = []
         producedURLs = []
         shareItems = []
@@ -102,12 +102,12 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 throw GemmaTextRunnerError.runtime(textAvailability.detail)
             }
 
-            try await captionRunner.makeSession(modelURL: textURL)
-            defer { Task { await captionRunner.destroySession() } }
-            let captionPrompt = ProductionPrompts.captionPrompt(backgroundBriefing: backgroundBriefing, story: story, producedVisualSummary: productionSummary)
-            let parsed = try await captionRunner.sendJSON(ProductionToolSchema.userMessageJSON(text: captionPrompt))
-            captionText = parsed.text
-            shareItems = producedURLs + [captionText].filter { !$0.isEmpty }
+            try await postBodyRunner.makeToolSession(modelURL: textURL, toolsJSON: PostBodyToolSchema.toolsJSON)
+            defer { Task { await postBodyRunner.destroySession() } }
+            let postBodyPrompt = ProductionPrompts.postBodyPrompt(backgroundBriefing: backgroundBriefing, story: story, producedVisualSummary: productionSummary)
+            let parsed = try await postBodyRunner.sendJSON(ProductionToolSchema.userMessageJSON(text: postBodyPrompt, assets: productionAssets))
+            postBodyText = PostBodyToolSchema.extractPostBody(from: parsed)
+            shareItems = producedURLs + [postBodyText].filter { !$0.isEmpty }
         } catch {
             latestError = error.localizedDescription
         }
@@ -131,9 +131,9 @@ final class ProductionWorkflowViewModel: ObservableObject {
             try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
         }
 
-        if !captionText.isEmpty {
-            let captionURL = directory.appendingPathComponent("caption.txt", isDirectory: false)
-            try captionText.write(to: captionURL, atomically: true, encoding: .utf8)
+        if !postBodyText.isEmpty {
+            let postBodyURL = directory.appendingPathComponent("post-body.txt", isDirectory: false)
+            try postBodyText.write(to: postBodyURL, atomically: true, encoding: .utf8)
         }
 
         exportDirectoryURL = directory
@@ -149,9 +149,9 @@ final class ProductionWorkflowViewModel: ObservableObject {
         }
     }
 
-    func copyCaptionToPasteboard() {
-        guard !captionText.isEmpty else { return }
-        UIPasteboard.general.string = captionText
+    func copyPostBodyToPasteboard() {
+        guard !postBodyText.isEmpty else { return }
+        UIPasteboard.general.string = postBodyText
     }
 
     private func makeProductionAssets() -> [ProductionAssetDescriptor] {
@@ -218,7 +218,7 @@ enum ProductionPrompts {
         let assetList = assets.map(\.promptSummary).joined(separator: "\n- ")
         let validSourceIDs = assets.map(\.toolID).joined(separator: ", ")
         return """
-        You are preparing disaster-relief social media content.
+        You are preparing social-media content from the user's briefing, story text, and attached media.
         Background briefing:
         \(backgroundBriefing.isEmpty ? "(none provided)" : backgroundBriefing)
 
@@ -245,9 +245,9 @@ enum ProductionPrompts {
         """
     }
 
-    static func captionPrompt(backgroundBriefing: String, story: String, producedVisualSummary: String) -> String {
+    static func postBodyPrompt(backgroundBriefing: String, story: String, producedVisualSummary: String) -> String {
         """
-        Write the social-media caption text for a disaster-relief post.
+        Write the Instagram post body text grounded in the user's briefing, story text, attached media, and produced visual summary.
         Background briefing:
         \(backgroundBriefing.isEmpty ? "(none provided)" : backgroundBriefing)
 
@@ -259,5 +259,42 @@ enum ProductionPrompts {
 
         Keep it publication-ready and concise.
         """
+    }
+}
+
+enum PostBodyToolSchema {
+    static let toolName = "submit_post_body"
+    static let fieldName = "post_body_text"
+
+    static let toolsJSON = """
+    [
+      {
+        "type": "function",
+        "function": {
+          "name": "\(toolName)",
+          "description": "Submit the final publication-ready post body text for the social post.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "\(fieldName)": {
+                "type": "string",
+                "description": "Only the final user-facing Instagram post body text that appears below the media. Do not include labels, explanations, markdown formatting, surrounding quotes, or code fences."
+              }
+            },
+            "required": ["\(fieldName)"]
+          }
+        }
+      }
+    ]
+    """
+
+    static func extractPostBody(from parsed: LiteRTParsedMessage) -> String {
+        if let toolCall = parsed.toolCalls.first(where: { $0.name == toolName }),
+           let postBody = toolCall.arguments[fieldName]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !postBody.isEmpty {
+            return postBody
+        }
+        return parsed.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

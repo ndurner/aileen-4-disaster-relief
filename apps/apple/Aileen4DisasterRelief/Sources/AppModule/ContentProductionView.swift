@@ -18,7 +18,7 @@ struct ContentProductionView: View {
                         }
                     }
 
-                    Picker("Caption model", selection: $appState.selectedTextModel) {
+                    Picker("Post body model", selection: $appState.selectedTextModel) {
                         ForEach(ModelOption.allCases) { model in
                             Text("\(model.displayName) (\(model.defaultUse))").tag(model)
                         }
@@ -61,7 +61,7 @@ struct ContentProductionView: View {
                 }
 
                 Section("Production") {
-                    Button(viewModel.isRunning ? "Producing..." : "Produce visuals + caption") {
+                    Button(viewModel.isRunning ? "Producing..." : "Produce visuals + post body") {
                         Task {
                             await viewModel.run(
                                 backgroundBriefing: appState.backgroundBriefing,
@@ -90,9 +90,9 @@ struct ContentProductionView: View {
                     }
                 }
 
-                if !viewModel.captionText.isEmpty {
-                    Section("Caption") {
-                        Text(viewModel.captionText)
+                if !viewModel.postBodyText.isEmpty {
+                    Section("Post body") {
+                        Text(viewModel.postBodyText)
                         Button(ProcessInfo.processInfo.isiOSAppOnMac ? "Export results" : "Share results") {
                             if ProcessInfo.processInfo.isiOSAppOnMac {
                                 viewModel.openExportDirectory()
