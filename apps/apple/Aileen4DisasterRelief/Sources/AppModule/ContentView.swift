@@ -2,42 +2,29 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var selectedTab: Tab = .backgroundBriefing
-    @State private var appliedInitialTabSelection = false
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            BackgroundBriefingView()
-                .tag(Tab.backgroundBriefing)
-                .tabItem {
-                    Label("Background briefing", systemImage: "doc.text")
-                }
+        ZStack {
+            OceanBackdrop()
 
-            ContentProductionView()
-                .tag(Tab.contentProduction)
-                .tabItem {
-                    Label("Content production", systemImage: "sparkles.rectangle.stack")
-                }
-
-            SettingsView()
-                .tag(Tab.settings)
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape")
-                }
-        }
-        .onAppear {
-            guard !appliedInitialTabSelection else { return }
-            appliedInitialTabSelection = true
-
-            if appState.hasBackgroundBriefing {
-                selectedTab = .contentProduction
+            ZStack {
+                tabLayer(BackgroundBriefingView(), for: .backgroundBriefing)
+                tabLayer(ContentProductionView(), for: .contentProduction)
+                tabLayer(SettingsView(), for: .settings)
             }
+            .animation(.snappy(duration: 0.35, extraBounce: 0.05), value: appState.selectedTab)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            OceanTabBar(selection: $appState.selectedTab)
+        }
+        .tint(OceanPalette.deepWater)
     }
 
-    private enum Tab {
-        case backgroundBriefing
-        case contentProduction
-        case settings
+    private func tabLayer<Screen: View>(_ screen: Screen, for tab: AppTab) -> some View {
+        screen
+            .opacity(appState.selectedTab == tab ? 1 : 0)
+            .allowsHitTesting(appState.selectedTab == tab)
+            .accessibilityHidden(appState.selectedTab != tab)
+            .zIndex(appState.selectedTab == tab ? 1 : 0)
     }
 }
