@@ -11,6 +11,20 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Selected models") {
+                    Picker("Visual model", selection: $appState.selectedProductionModel) {
+                        ForEach(ModelOption.allCases) { model in
+                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
+                        }
+                    }
+
+                    Picker("Post body model", selection: $appState.selectedTextModel) {
+                        ForEach(ModelOption.allCases) { model in
+                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
+                        }
+                    }
+                }
+
                 Section("Model source") {
                     Picker("Prefer", selection: $appState.preferredModelSource) {
                         ForEach(ModelSourcePreference.allCases) { source in

@@ -12,18 +12,6 @@ struct ContentProductionView: View {
         NavigationStack {
             Form {
                 Section("Inputs") {
-                    Picker("Visual model", selection: $appState.selectedProductionModel) {
-                        ForEach(ModelOption.allCases) { model in
-                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
-                        }
-                    }
-
-                    Picker("Post body model", selection: $appState.selectedTextModel) {
-                        ForEach(ModelOption.allCases) { model in
-                            Text("\(model.displayName) (\(model.defaultUse))").tag(model)
-                        }
-                    }
-
                     Picker("Output", selection: $viewModel.outputKind) {
                         Text("Image").tag(ProductionWorkflowViewModel.OutputKind.image)
                         Text("Reel").tag(ProductionWorkflowViewModel.OutputKind.reel)
