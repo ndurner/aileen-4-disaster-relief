@@ -62,6 +62,19 @@ struct LiteRTToolCall: Identifiable {
     let id = UUID()
     let name: String
     let arguments: [String: LiteRTToolValue]
+
+    var logDescription: String {
+        let formattedArguments = arguments
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value.description)" }
+            .joined(separator: ", ")
+
+        if formattedArguments.isEmpty {
+            return "Tool call: \(name)"
+        }
+
+        return "Tool call: \(name) (\(formattedArguments))"
+    }
 }
 
 struct LiteRTParsedMessage {

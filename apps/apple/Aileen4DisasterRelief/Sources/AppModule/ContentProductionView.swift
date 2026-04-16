@@ -63,15 +63,6 @@ struct ContentProductionView: View {
                     .disabled(viewModel.isRunning)
                 }
 
-                if !viewModel.executedToolCalls.isEmpty {
-                    Section("Tool calls") {
-                        ForEach(viewModel.executedToolCalls) { toolCall in
-                            Text(verbatim: "\(toolCall.name) \(toolCall.arguments)")
-                                .font(.footnote.monospaced())
-                        }
-                    }
-                }
-
                 if !viewModel.productionSummary.isEmpty {
                     Section("Visual production summary") {
                         Text(viewModel.productionSummary)

@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import OSLog
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -20,11 +21,15 @@ final class ProductionWorkflowViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var productionSummary = ""
     @Published var postBodyText = ""
-    @Published var executedToolCalls: [LiteRTToolCall] = []
     @Published var producedURLs: [URL] = []
     @Published var shareItems: [Any] = []
     @Published var exportDirectoryURL: URL?
     @Published var latestError: String?
+
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Aileen4DisasterRelief",
+        category: "ProductionWorkflow"
+    )
 
     private let locator = ModelLocator()
     private let toolEngine = GemmaToolCallingEngine()
@@ -72,7 +77,6 @@ final class ProductionWorkflowViewModel: ObservableObject {
         latestError = nil
         productionSummary = ""
         postBodyText = ""
-        executedToolCalls = []
         producedURLs = []
         shareItems = []
         exportDirectoryURL = nil
@@ -93,7 +97,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 sourceAssets: productionAssets,
                 outputKind: outputKind
             )
-            executedToolCalls = toolResult.toolCalls
+            logToolCalls(toolResult.toolCalls)
             productionSummary = toolResult.finalText
             producedURLs = toolResult.producedURLs
 
@@ -210,6 +214,14 @@ final class ProductionWorkflowViewModel: ObservableObject {
         let name = "Imported File \(nextImportedFileNumber)"
         nextImportedFileNumber += 1
         return sourceURL.pathExtension.isEmpty ? name : "\(name).\(sourceURL.pathExtension.lowercased())"
+    }
+
+    private func logToolCalls(_ toolCalls: [LiteRTToolCall]) {
+        guard !toolCalls.isEmpty else { return }
+        Self.logger.notice("Executed \(toolCalls.count, privacy: .public) tool call(s)")
+        for toolCall in toolCalls {
+            Self.logger.notice("\(toolCall.logDescription, privacy: .public)")
+        }
     }
 }
 
