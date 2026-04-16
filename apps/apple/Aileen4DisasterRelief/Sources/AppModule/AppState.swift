@@ -33,6 +33,10 @@ final class AppState: ObservableObject {
         preferredModelSource = ModelSourcePreference(rawValue: defaults.string(forKey: Keys.preferredModelSource) ?? "") ?? .injected
     }
 
+    var hasBackgroundBriefing: Bool {
+        !backgroundBriefing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private enum Keys {
         static let backgroundBriefing = "backgroundBriefing"
         static let story = "story"
