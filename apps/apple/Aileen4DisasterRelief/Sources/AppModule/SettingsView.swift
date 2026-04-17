@@ -9,13 +9,13 @@ struct SettingsView: View {
     private let modelLocator = ModelLocator()
 
     var body: some View {
-        OceanScreen(
-            eyebrow: "Toolkit",
-            title: "Settings",
-            subtitle: "Choose how visuals and post copy are produced."
-        ) {
-            OceanCard {
-                OceanSectionHeader(title: "Selected models")
+        OceanScreen {
+            AileenWorkflowCard(
+                    imageName: "AileenSettingsScene",
+                    title: "Choose my tools",
+                    message: "Set whether I run on device, in the cloud, or with imported models."
+                ) {
+
                 modelPicker(title: "Visual model", selection: $appState.selectedProductionModel)
                 modelPicker(title: "Post body model", selection: $appState.selectedTextModel)
             }
@@ -60,7 +60,7 @@ struct SettingsView: View {
             }
 
             OceanCard {
-                OceanSectionHeader(title: "Import a model")
+                OceanSectionHeader(title: "Add a model file")
 
                 Button("Import .litertlm from Files") {
                     importPickerPresented = true
@@ -71,24 +71,6 @@ struct SettingsView: View {
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(OceanPalette.ink.opacity(0.64))
                     .fixedSize(horizontal: false, vertical: true)
-            }
-
-            OceanCard {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "video.badge.waveform")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(OceanPalette.deepWater)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(OceanPalette.tideFoam)
-                        )
-
-                    Text("The app uses Apple-native media rendering for on-device image and reel assembly on iPhone, iPad, and Designed for iPad on Mac.")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(OceanPalette.ink.opacity(0.72))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
         .fileImporter(

@@ -9,13 +9,14 @@ struct ContentProductionView: View {
     @State private var shareSheetPresented = false
 
     var body: some View {
-        OceanScreen(
-            eyebrow: "Content Studio",
-            title: "Content production",
-            subtitle: "Pair a short story with imagery, then generate visuals and post copy in one pass."
-        ) {
-            OceanCard {
-                OceanSectionHeader(title: "Story and format", detail: "Inputs")
+        OceanScreen {
+            AileenWorkflowCard(
+                    imageName: "AileenProductionScene",
+                    title: "Build the next update",
+                    message: "Give me the angle, format, and media to build the next post.",
+                    bandMidOpacity: 0.56,
+                    bandBottomOpacity: 0.93
+                ) {
 
                 Picker("Output", selection: $viewModel.outputKind) {
                     Text("Image").tag(ProductionWorkflowViewModel.OutputKind.image)
@@ -130,11 +131,6 @@ struct ContentProductionView: View {
                 }
                 .buttonStyle(OceanPrimaryButtonStyle())
                 .disabled(viewModel.isRunning)
-
-                Text("The app assembles visuals first, then writes the post body from the same briefing and story.")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(OceanPalette.ink.opacity(0.62))
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if !viewModel.productionSummary.isEmpty {

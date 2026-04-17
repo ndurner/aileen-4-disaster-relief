@@ -45,15 +45,15 @@ struct OceanBackdrop: View {
 }
 
 struct OceanScreen<Content: View>: View {
-    let eyebrow: String
-    let title: String
-    let subtitle: String
+    let eyebrow: String?
+    let title: String?
+    let subtitle: String?
     private let content: Content
 
     init(
-        eyebrow: String,
-        title: String,
-        subtitle: String,
+        eyebrow: String? = nil,
+        title: String? = nil,
+        subtitle: String? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.eyebrow = eyebrow
@@ -64,8 +64,10 @@ struct OceanScreen<Content: View>: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                header
+            VStack(alignment: .leading, spacing: 20) {
+                if showsHeader {
+                    header
+                }
                 content
             }
             .padding(.horizontal, 20)
@@ -75,21 +77,40 @@ struct OceanScreen<Content: View>: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
+    private var showsHeader: Bool {
+        !normalized(eyebrow).isEmpty || !normalized(title).isEmpty || !normalized(subtitle).isEmpty
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
-            OceanBadge(text: eyebrow)
+            if let eyebrow = nonEmpty(eyebrow) {
+                OceanBadge(text: eyebrow)
+            }
 
-            Text(title)
-                .font(.system(size: 38, weight: .bold, design: .rounded))
-                .foregroundStyle(OceanPalette.ink)
-                .fixedSize(horizontal: false, vertical: true)
+            if let title = nonEmpty(title) {
+                Text(title)
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(OceanPalette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            Text(subtitle)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(OceanPalette.ink.opacity(0.70))
-                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle = nonEmpty(subtitle) {
+                Text(subtitle)
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
+                    .foregroundStyle(OceanPalette.ink.opacity(0.70))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.top, 8)
+    }
+
+    private func normalized(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        let trimmed = normalized(value)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
@@ -288,6 +309,154 @@ struct OceanSecondaryButtonStyle: ButtonStyle {
                     .stroke(Color.white.opacity(0.72), lineWidth: 1)
             )
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+    }
+}
+
+struct AileenSceneArtwork: View {
+    let imageName: String
+    var height: CGFloat = 184
+    var cornerRadius: CGFloat = 28
+
+    var body: some View {
+        Image(imageName)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+struct AileenWorkflowCard<Content: View>: View {
+    let imageName: String
+    let title: String
+    let message: String
+    let bandMidOpacity: Double
+    let bandBottomOpacity: Double
+    private let content: Content
+
+    init(
+        imageName: String,
+        title: String,
+        message: String,
+        bandMidOpacity: Double = 0.44,
+        bandBottomOpacity: Double = 0.84,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.imageName = imageName
+        self.title = title
+        self.message = message
+        self.bandMidOpacity = bandMidOpacity
+        self.bandBottomOpacity = bandBottomOpacity
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ZStack(alignment: .bottomLeading) {
+                AileenSceneArtwork(imageName: imageName)
+
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            OceanPalette.deepWater.opacity(bandMidOpacity),
+                            OceanPalette.ink.opacity(bandBottomOpacity)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 116)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.white)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.94))
+                        .lineSpacing(1.2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: 255, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+            }
+
+            content
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(Color.white.opacity(0.74))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+        )
+        .shadow(color: OceanPalette.deepWater.opacity(0.08), radius: 28, x: 0, y: 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(title). \(message)")
+    }
+}
+
+struct AileenLaunchSplash: View {
+    var body: some View {
+        ZStack {
+            Image("AileenLaunchScene")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.04),
+                    OceanPalette.deepWater.opacity(0.18),
+                    OceanPalette.ink.opacity(0.90)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 16) {
+                Spacer(minLength: 0)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Aileen")
+                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.white)
+                        .shadow(color: OceanPalette.ink.opacity(0.35), radius: 10, x: 0, y: 4)
+
+                    Text("AI office assistant")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.84))
+
+                    Text("Preparing your workspace")
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.96))
+                        .padding(.top, 6)
+                }
+                .frame(maxWidth: 260, alignment: .leading)
+
+                ProgressView()
+                    .tint(Color.white.opacity(0.96))
+                    .scaleEffect(1.05)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 42)
+        }
+        .ignoresSafeArea()
+        .accessibilityElement(children: .contain)
     }
 }
 
