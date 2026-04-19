@@ -134,7 +134,7 @@ final class AppleMediaTooling: @unchecked Sendable {
     }
 
     private func composeVisuals(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
-        guard let assetIDs = arguments["asset_ids"]?.stringArrayValue, !assetIDs.isEmpty else {
+        guard let assetIDs = composeAssetIDs(from: arguments), !assetIDs.isEmpty else {
             throw MediaToolingError.invalidArguments("compose_visuals requires one or more asset_ids.")
         }
 
@@ -168,6 +168,9 @@ final class AppleMediaTooling: @unchecked Sendable {
         }
 
         let asset = try resolveAsset(assetID)
+        if asset.latestOverlayRequest != nil {
+            return try await moveTextOverlay(arguments: arguments)
+        }
         let requestedOverlay = try overlayRequest(
             from: arguments,
             defaultingTo: nil,
@@ -334,6 +337,44 @@ final class AppleMediaTooling: @unchecked Sendable {
             throw MediaToolingError.missingAsset("Unknown asset_id \(toolID).")
         }
         return asset
+    }
+
+    private func composeAssetIDs(from arguments: [String: LiteRTToolValue]) -> [String]? {
+        if let assetIDs = arguments["asset_ids"]?.stringArrayValue?.filter({ !$0.isEmpty }),
+           !assetIDs.isEmpty {
+            return assetIDs
+        }
+
+        if let assetID = arguments["asset_id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !assetID.isEmpty {
+            return [assetID]
+        }
+
+        if let raw = arguments["asset_ids"]?.stringValue {
+            let normalized = raw
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            let parts = normalized
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if !parts.isEmpty {
+                return parts
+            }
+            if !normalized.isEmpty {
+                return [normalized]
+            }
+        }
+
+        let sourceAssetIDs = assets.values
+            .filter { $0.baseAssetID == nil }
+            .map(\.toolID)
+            .sorted()
+        if sourceAssetIDs.count == 1 {
+            return sourceAssetIDs
+        }
+
+        return nil
     }
 
     private func registerRenderedAsset(

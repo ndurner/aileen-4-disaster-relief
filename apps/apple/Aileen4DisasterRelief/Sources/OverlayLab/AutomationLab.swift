@@ -18,6 +18,7 @@ struct OverlayAutomationConfig: Decodable {
         let backgroundBriefing: String
         let story: String
         let promptAddendum: String?
+        let promptPackagingMode: String?
         let outputKind: String
         let model: String
         let modelSource: String
@@ -467,6 +468,7 @@ enum OverlayAutomationLab {
             modelURL: modelURL,
             sourceAssets: sourceAssets,
             outputKind: outputKind,
+            systemMessageJSON: ProductionPrompts.productionSystemMessageJSON,
             enableThinking: enableThinking,
             protectedRegionProvider: protectedRegionProvider,
             protectedRegionsOverride: protectedRegions,

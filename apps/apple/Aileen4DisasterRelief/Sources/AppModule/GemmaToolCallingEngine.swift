@@ -72,6 +72,7 @@ actor GemmaToolCallingEngine {
         modelURL: URL,
         sourceAssets: [ProductionAssetDescriptor],
         outputKind: ProductionWorkflowViewModel.OutputKind,
+        systemMessageJSON: String,
         enableThinking: Bool = false,
         protectedRegionProvider: OverlayProtectedRegionProvider = .none,
         protectedRegionsOverride: OverlayProtectedRegions = .empty,
@@ -82,7 +83,7 @@ actor GemmaToolCallingEngine {
         try await runner.makeToolSession(
             modelURL: modelURL,
             toolsJSON: ProductionToolSchema.toolsJSON,
-            systemMessageJSON: nil,
+            systemMessageJSON: systemMessageJSON,
             extraContextJSON: extraContextJSON
         )
         do {
@@ -134,6 +135,7 @@ actor GemmaToolCallingEngine {
                     initialPrompt: initialPrompt,
                     responses: responses,
                     modelURL: modelURL,
+                    systemMessageJSON: systemMessageJSON,
                     extraContextJSON: extraContextJSON
                 ) {
                     parsed = try await runner.sendJSON(continuation)
@@ -201,7 +203,7 @@ actor GemmaToolCallingEngine {
         try await runner.makeToolSession(
             modelURL: modelURL,
             toolsJSON: ReviewToolSchema.toolsJSON(allowsAccept: mode.allowsAccept),
-            systemMessageJSON: nil,
+            systemMessageJSON: ReviewToolSchema.systemMessageJSON(allowsAccept: mode.allowsAccept),
             extraContextJSON: extraContextJSON
         )
         let renderedAsset = ProductionAssetDescriptor(
@@ -259,6 +261,7 @@ actor GemmaToolCallingEngine {
         initialPrompt: String,
         responses: [MediaToolResult],
         modelURL: URL,
+        systemMessageJSON: String,
         extraContextJSON: String?
     ) async throws -> String? {
         guard let latestRendered = responses.last(where: { $0.outputURL != nil }),
@@ -270,7 +273,7 @@ actor GemmaToolCallingEngine {
         try await runner.makeToolSession(
             modelURL: modelURL,
             toolsJSON: ProductionToolSchema.toolsJSON,
-            systemMessageJSON: nil,
+            systemMessageJSON: systemMessageJSON,
             extraContextJSON: extraContextJSON
         )
 
@@ -448,6 +451,16 @@ enum ProductionToolSchema {
         ]
         return stringify(message)
     }
+
+    static func systemTextJSON(_ text: String) -> String {
+        stringify([
+            [
+                "type": "text",
+                "text": text
+            ]
+        ])
+    }
+
     static func toolResponseJSON(for results: [MediaToolResult]) throws -> String {
         var content: [[String: Any]] = []
         for result in results {
@@ -598,18 +611,18 @@ enum ProductionToolSchema {
         } else {
             nextStepInstruction = """
             The attached frame is a composed base render with no accepted overlay yet.
-            If it would benefit from one overlay, call add_text_overlay on asset_id \(renderedAssetID) and include an explicit overlay_text string.
+            This workflow requires one overlay, so call add_text_overlay on asset_id \(renderedAssetID) and include an explicit overlay_text string.
             Do not call add_text_overlay without overlay_text.
             Use move_text_overlay only after an overlay already exists on the current rendered frame.
-            If the current rendered frame is already publishable without text, stop without another tool call.
+            Do not stop while the current rendered frame still has no overlay.
             """
         }
 
         return """
         Continue the same content-production task from the latest rendered frame only.
 
-        Original task:
-        \(originalPrompt)
+        Task reminder:
+        \(continuationTaskReminder(from: originalPrompt))
 
         Latest tool results:
         \(responseSummary)
@@ -619,6 +632,67 @@ enum ProductionToolSchema {
         Do not repeat compose_visuals unless the composition itself is materially wrong.
         \(nextStepInstruction)
         """
+    }
+
+    // TODO: do we need this?
+    private static func continuationTaskReminder(from originalPrompt: String) -> String {
+        let markers = [
+            "briefing_editorial_digest:",
+            "background_briefing (exact user-supplied briefing text):",
+            "brand_voice_digest:",
+            "story (factual seed text; may be sparse or a test):",
+            "story (exact user-supplied story text; may be sparse or a test):",
+            "story_mode:",
+            "story_intent_guidance:",
+            "overlay_copy_policy:",
+            "requested_output:",
+            "output_canvas:"
+        ]
+
+        let terminators = [
+            "available_media_assets:",
+            "valid_source_asset_ids:",
+            "If images or video previews are attached,",
+            "Additional experiment guidance:"
+        ]
+
+        var sections: [String] = []
+        for marker in markers {
+            guard let markerRange = originalPrompt.range(of: marker) else { continue }
+            let contentStart = markerRange.upperBound
+            var endIndex = originalPrompt.endIndex
+
+            let candidateTerminators = markers
+                .filter { $0 != marker }
+                .map { "\n\($0)" } + terminators.map { "\n\($0)" }
+            for terminator in candidateTerminators {
+                guard let range = originalPrompt.range(of: terminator, range: contentStart..<originalPrompt.endIndex),
+                      range.lowerBound < endIndex else {
+                    continue
+                }
+                endIndex = range.lowerBound
+            }
+
+            let content = originalPrompt[contentStart..<endIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !content.isEmpty else { continue }
+            sections.append("\(marker)\n\(content)")
+        }
+
+        if let addendumRange = originalPrompt.range(of: "Additional experiment guidance:") {
+            let addendum = originalPrompt[addendumRange.lowerBound..<originalPrompt.endIndex]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !addendum.isEmpty {
+                sections.append(addendum)
+            }
+        }
+
+        let reminder = sections.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard reminder.count > 1_800 else {
+            return reminder
+        }
+
+        let prefix = String(reminder.prefix(1_800)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(prefix)\n[truncated reminder]"
     }
 }
 
@@ -735,6 +809,25 @@ private enum ReviewToolSchema {
           }
         ]
         """
+    }
+
+    static func systemMessageJSON(allowsAccept: Bool) -> String {
+        let instruction = allowsAccept
+            ? """
+            You are reviewing a rendered social-media image that already has one drawn text label.
+            Judge the actual pixels in the attached image, not the prior reasoning.
+            Prior user text, prior model text, and prior tool choices are context only and must not justify a weak placement.
+            Use move_text_overlay only when you can clearly improve placement or style.
+            Use accept_overlay_layout only when the current drawn label is already publishable as-is.
+            """
+            : """
+            You are reviewing a rendered social-media image that already has one drawn text label.
+            Judge the actual pixels in the attached image, not the prior reasoning.
+            Prior user text, prior model text, and prior tool choices are context only and must not justify a weak placement.
+            Use move_text_overlay only when you can clearly improve placement or style.
+            If you cannot clearly improve the current drawn label, do not call any tool.
+            """
+        return ProductionToolSchema.systemTextJSON(instruction)
     }
 
     static func reviewPrompt(
