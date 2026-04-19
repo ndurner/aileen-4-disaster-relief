@@ -35,3 +35,10 @@ Apple app project generation:
         - Swift/Clang/C++ settings, preprocessor definitions, runpaths, linker flags, or framework embed rules
     - The script currently auto-includes only Swift files directly inside `apps/apple/Aileen4DisasterRelief/Sources/AppModule/`; if code is reorganized into subdirectories, extra modules, tests, extensions, additional targets, Swift packages, or more resources, teach the script about that structure.
     - Any manual edits made directly in `apps/apple/Aileen4DisasterRelief.xcodeproj/project.pbxproj` are disposable unless the generator is updated to reproduce them.
+
+Overlay lab organization:
+    - Keep overlay experimentation code that is not part of the main app flow segregated under:
+        - `apps/apple/Aileen4DisasterRelief/Sources/OverlayLab/` for app-side lab hooks
+        - `apps/apple/overlay-lab/` for lab scripts, fixtures, and lab-specific docs
+    - Prefer a dedicated `apps/apple/overlay-lab/README.md` for lab usage notes instead of expanding `apps/apple/README.md` with experimental workflow detail.
+    - If the lab folder structure changes, update `apps/apple/scripts/generate_xcodeproj.rb` so the generated Xcode project stays faithful to that segregation.
