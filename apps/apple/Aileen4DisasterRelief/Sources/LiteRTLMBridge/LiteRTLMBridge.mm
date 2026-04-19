@@ -34,6 +34,19 @@ bool DebugLoggingEnabled() {
   return flag != nullptr && std::strlen(flag) > 0 && std::strcmp(flag, "0") != 0;
 }
 
+int ResolveMaxOutputTokens() {
+  const char* override = std::getenv("GEMMA_LITERT_MAX_OUTPUT_TOKENS");
+  if (override == nullptr || std::strlen(override) == 0) {
+    return 4000;
+  }
+  char* end = nullptr;
+  const long parsed = std::strtol(override, &end, 10);
+  if (end == override || parsed <= 0 || parsed > 8192) {
+    return 4000;
+  }
+  return static_cast<int>(parsed);
+}
+
 uint64_t CurrentResidentSizeBytes() {
   mach_task_basic_info_data_t info;
   mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
@@ -198,7 +211,8 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
     return nullptr;
   }
 
-  litert_lm_session_config_set_max_output_tokens(session_config, 1024);
+  litert_lm_session_config_set_max_output_tokens(session_config,
+                                                 ResolveMaxOutputTokens());
 
   auto* conversation_config = litert_lm_conversation_config_create(
       engine, session_config, system_message_json,
