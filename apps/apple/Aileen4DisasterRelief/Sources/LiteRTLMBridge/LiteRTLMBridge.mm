@@ -1,5 +1,6 @@
 #include "include/AileenLiteRTLMBridge.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -8,12 +9,16 @@
 #import <Foundation/Foundation.h>
 
 #include <LiteRTLM/engine.h>
+#include <mach/mach.h>
 #endif
 
 struct GemmaBridgeSession {
 #if GEMMA_LITERTLM_LINKED
   LiteRtLmEngine* engine = nullptr;
   LiteRtLmConversation* conversation = nullptr;
+  std::string extra_context_json;
+  uint64_t session_id = 0;
+  uint64_t conversation_generation = 0;
 #endif
 };
 
@@ -22,9 +27,102 @@ namespace {
 #if GEMMA_LITERTLM_LINKED
 thread_local std::string g_last_error;
 thread_local std::string g_last_response_json;
+std::atomic<uint64_t> g_next_session_id{1};
+
+bool DebugLoggingEnabled() {
+  const char* flag = std::getenv("AILEEN_GEMMA_BRIDGE_DEBUG");
+  return flag != nullptr && std::strlen(flag) > 0 && std::strcmp(flag, "0") != 0;
+}
+
+uint64_t CurrentResidentSizeBytes() {
+  mach_task_basic_info_data_t info;
+  mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+  const kern_return_t result =
+      task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                reinterpret_cast<task_info_t>(&info), &count);
+  if (result != KERN_SUCCESS) {
+    return 0;
+  }
+  return static_cast<uint64_t>(info.resident_size);
+}
+
+void DebugLog(NSString* message) {
+  if (!DebugLoggingEnabled()) {
+    return;
+  }
+  NSString* line = [NSString
+      stringWithFormat:@"[AileenLiteRT] %@\n",
+                       message == nil ? @"(null)" : message];
+  const char* path = std::getenv("AILEEN_GEMMA_BRIDGE_LOG_PATH");
+  if (path != nullptr && std::strlen(path) > 0) {
+    NSString* log_path = [[NSString alloc] initWithUTF8String:path];
+    if (log_path != nil) {
+      if (![log_path isAbsolutePath]) {
+        log_path = [NSHomeDirectory() stringByAppendingPathComponent:log_path];
+      }
+      NSData* data = [line dataUsingEncoding:NSUTF8StringEncoding];
+      if (data != nil) {
+        NSString* directory =
+            [log_path stringByDeletingLastPathComponent];
+        if (directory.length > 0) {
+          [[NSFileManager defaultManager]
+              createDirectoryAtPath:directory
+        withIntermediateDirectories:YES
+                         attributes:nil
+                              error:nil];
+        }
+        if (![[NSFileManager defaultManager] fileExistsAtPath:log_path]) {
+          [[NSFileManager defaultManager]
+              createFileAtPath:log_path contents:nil attributes:nil];
+        }
+        NSFileHandle* handle =
+            [NSFileHandle fileHandleForWritingAtPath:log_path];
+        if (handle != nil) {
+          @try {
+            [handle seekToEndOfFile];
+            [handle writeData:data];
+          } @catch (__unused NSException* exception) {
+          }
+          [handle closeFile];
+          return;
+        }
+      }
+    }
+  }
+  fprintf(stderr, "%s", line.UTF8String);
+}
+
+void DebugLogSession(const char* phase, GemmaBridgeSession* session,
+                     size_t message_length = 0, size_t tools_length = 0,
+                     size_t system_length = 0) {
+  if (!DebugLoggingEnabled()) {
+    return;
+  }
+
+  const uint64_t session_id = session == nullptr ? 0 : session->session_id;
+  const uint64_t generation =
+      session == nullptr ? 0 : session->conversation_generation;
+  const void* engine_ptr = session == nullptr ? nullptr : session->engine;
+  const void* conversation_ptr =
+      session == nullptr ? nullptr : session->conversation;
+  const unsigned long long resident_mb =
+      CurrentResidentSizeBytes() / (1024ull * 1024ull);
+  NSString* log_line = [NSString
+      stringWithFormat:
+          @"phase=%s session=%llu generation=%llu engine=%p conversation=%p "
+           "resident_mb=%llu message_bytes=%zu tools_bytes=%zu system_bytes=%zu "
+           "extra_context_bytes=%zu",
+          phase, session_id, generation, engine_ptr, conversation_ptr,
+          resident_mb, message_length, tools_length, system_length,
+          session == nullptr ? 0 : session->extra_context_json.size()];
+  DebugLog(log_line);
+}
 
 const char* SetLastError(const std::string& message) {
   g_last_error = message;
+  if (DebugLoggingEnabled()) {
+    DebugLog([NSString stringWithFormat:@"error=%s", g_last_error.c_str()]);
+  }
   return g_last_error.c_str();
 }
 
@@ -34,6 +132,7 @@ const char* SetLastError(NSString* message) {
 }
 
 LiteRtLmEngine* CreateEngine(const char* model_path, const char** error_message) {
+  @autoreleasepool {
   const char* text_backend = std::getenv("GEMMA_LITERT_TEXT_BACKEND");
   const char* vision_backend = std::getenv("GEMMA_LITERT_VISION_BACKEND");
   auto* settings = litert_lm_engine_settings_create(
@@ -83,10 +182,13 @@ LiteRtLmEngine* CreateEngine(const char* model_path, const char** error_message)
     *error_message = SetLastError("Failed to create LiteRT-LM engine.");
   }
   return engine;
+  }
 }
 
 LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
+                                         const char* system_message_json,
                                          const char* tools_json,
+                                         const char* messages_json,
                                          const char** error_message) {
   auto* session_config = litert_lm_session_config_create();
   if (session_config == nullptr) {
@@ -99,8 +201,8 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
   litert_lm_session_config_set_max_output_tokens(session_config, 1024);
 
   auto* conversation_config = litert_lm_conversation_config_create(
-      engine, session_config, /*system_message_json=*/nullptr,
-      /*tools_json=*/tools_json, /*messages_json=*/nullptr,
+      engine, session_config, system_message_json,
+      /*tools_json=*/tools_json, /*messages_json=*/messages_json,
       /*enable_constrained_decoding=*/false);
   litert_lm_session_config_delete(session_config);
 
@@ -147,6 +249,7 @@ std::string BuildMessageJson(const char* prompt,
                              const void* image_bytes,
                              size_t image_bytes_length,
                              const char** error_message) {
+  @autoreleasepool {
   NSString* prompt_string = [[NSString alloc] initWithUTF8String:prompt];
   if (prompt_string == nil || image_bytes == nullptr || image_bytes_length == 0) {
     if (error_message != nullptr) {
@@ -208,6 +311,7 @@ std::string BuildMessageJson(const char* prompt,
   }
 
   return std::string(json_string.UTF8String);
+  }
 }
 #endif
 
@@ -215,14 +319,24 @@ std::string BuildMessageJson(const char* prompt,
 
 GemmaBridgeSession* gemma_bridge_session_create(const char* model_path,
                                                 const char** error_message) {
-  return gemma_bridge_session_create_with_tools(model_path, nullptr,
-                                                error_message);
+  return gemma_bridge_session_create_with_system_and_tools(
+      model_path, nullptr, nullptr, error_message);
 }
 
 GemmaBridgeSession* gemma_bridge_session_create_with_tools(
     const char* model_path,
     const char* tools_json,
     const char** error_message) {
+  return gemma_bridge_session_create_with_system_and_tools(
+      model_path, nullptr, tools_json, error_message);
+}
+
+GemmaBridgeSession* gemma_bridge_session_create_with_system_and_tools(
+    const char* model_path,
+    const char* system_message_json,
+    const char* tools_json,
+    const char** error_message) {
+  @autoreleasepool {
   if (error_message != nullptr) {
     *error_message = nullptr;
   }
@@ -238,6 +352,7 @@ GemmaBridgeSession* gemma_bridge_session_create_with_tools(
   litert_lm_set_min_log_level(1);
 
   auto* bridge_session = new GemmaBridgeSession();
+  bridge_session->session_id = g_next_session_id.fetch_add(1);
   bridge_session->engine = CreateEngine(model_path, error_message);
   if (bridge_session->engine == nullptr) {
     delete bridge_session;
@@ -245,16 +360,23 @@ GemmaBridgeSession* gemma_bridge_session_create_with_tools(
   }
 
   bridge_session->conversation =
-      CreateConversation(bridge_session->engine, tools_json, error_message);
+      CreateConversation(bridge_session->engine, system_message_json, tools_json,
+                         /*messages_json=*/nullptr, error_message);
   if (bridge_session->conversation == nullptr) {
     litert_lm_engine_delete(bridge_session->engine);
     delete bridge_session;
     return nullptr;
   }
+  bridge_session->conversation_generation = 1;
+  DebugLogSession("create_session", bridge_session, 0,
+                  tools_json == nullptr ? 0 : std::strlen(tools_json),
+                  system_message_json == nullptr ? 0
+                                                 : std::strlen(system_message_json));
 
   return bridge_session;
 #else
   (void)model_path;
+  (void)system_message_json;
   (void)tools_json;
   if (error_message != nullptr) {
     *error_message =
@@ -263,14 +385,88 @@ GemmaBridgeSession* gemma_bridge_session_create_with_tools(
   }
   return nullptr;
 #endif
+  }
 }
 
-void gemma_bridge_session_destroy(GemmaBridgeSession* session) {
+int gemma_bridge_session_recreate_conversation(GemmaBridgeSession* session,
+                                               const char* system_message_json,
+                                               const char* tools_json,
+                                               const char** error_message) {
+  return gemma_bridge_session_recreate_conversation_with_history(
+      session, system_message_json, tools_json, /*messages_json=*/nullptr,
+      error_message);
+}
+
+int gemma_bridge_session_recreate_conversation_with_history(
+    GemmaBridgeSession* session,
+    const char* system_message_json,
+    const char* tools_json,
+    const char* messages_json,
+    const char** error_message) {
+  @autoreleasepool {
+  if (error_message != nullptr) {
+    *error_message = nullptr;
+  }
+
+#if GEMMA_LITERTLM_LINKED
+  if (session == nullptr || session->engine == nullptr) {
+    if (error_message != nullptr) {
+      *error_message = SetLastError("LiteRT-LM engine is not initialized.");
+    }
+    return 1;
+  }
+
+  if (session->conversation != nullptr) {
+    litert_lm_conversation_delete(session->conversation);
+    session->conversation = nullptr;
+  }
+
+  session->conversation = CreateConversation(session->engine, system_message_json,
+                                             tools_json, messages_json,
+                                             error_message);
+  if (session->conversation != nullptr) {
+    session->conversation_generation += 1;
+  }
+  DebugLogSession("recreate_conversation", session,
+                  messages_json == nullptr ? 0 : std::strlen(messages_json),
+                  tools_json == nullptr ? 0 : std::strlen(tools_json),
+                  system_message_json == nullptr ? 0
+                                                 : std::strlen(system_message_json));
+  return session->conversation == nullptr ? 1 : 0;
+#else
+  (void)session;
+  (void)system_message_json;
+  (void)tools_json;
+  if (error_message != nullptr) {
+    *error_message = "LiteRT-LM native runtime is not linked yet.";
+  }
+  return 1;
+#endif
+  }
+}
+
+void gemma_bridge_session_set_extra_context(GemmaBridgeSession* session,
+                                            const char* extra_context_json) {
   if (session == nullptr) {
     return;
   }
 
 #if GEMMA_LITERTLM_LINKED
+  session->extra_context_json =
+      extra_context_json == nullptr ? "" : std::string(extra_context_json);
+#else
+  (void)extra_context_json;
+#endif
+}
+
+void gemma_bridge_session_destroy(GemmaBridgeSession* session) {
+  @autoreleasepool {
+  if (session == nullptr) {
+    return;
+  }
+
+#if GEMMA_LITERTLM_LINKED
+  DebugLogSession("destroy_session", session);
   if (session->conversation != nullptr) {
     litert_lm_conversation_delete(session->conversation);
   }
@@ -280,6 +476,7 @@ void gemma_bridge_session_destroy(GemmaBridgeSession* session) {
 #endif
 
   delete session;
+  }
 }
 
 int gemma_bridge_session_stream(GemmaBridgeSession* session,
@@ -318,8 +515,11 @@ int gemma_bridge_session_stream(GemmaBridgeSession* session,
       .user_context = context,
   };
 
+  const char* extra_context = session->extra_context_json.empty()
+                                  ? nullptr
+                                  : session->extra_context_json.c_str();
   const int result = litert_lm_conversation_send_message_stream(
-      session->conversation, message_json.c_str(), /*extra_context=*/nullptr,
+      session->conversation, message_json.c_str(), extra_context,
       ForwardStreamChunk, stream_context);
 
   if (result != 0) {
@@ -339,6 +539,7 @@ int gemma_bridge_session_send_json(GemmaBridgeSession* session,
                                    const char* message_json,
                                    const char** response_json,
                                    const char** error_message) {
+  @autoreleasepool {
   if (response_json != nullptr) {
     *response_json = nullptr;
   }
@@ -355,9 +556,13 @@ int gemma_bridge_session_send_json(GemmaBridgeSession* session,
     return 1;
   }
 
+  const char* extra_context = session->extra_context_json.empty()
+                                  ? nullptr
+                                  : session->extra_context_json.c_str();
+  DebugLogSession("send_json_start", session, std::strlen(message_json));
   LiteRtLmJsonResponse* response =
       litert_lm_conversation_send_message(session->conversation, message_json,
-                                          /*extra_context=*/nullptr);
+                                          extra_context);
   if (response == nullptr) {
     if (error_message != nullptr) {
       *error_message = SetLastError("LiteRT-LM failed to send message.");
@@ -379,6 +584,7 @@ int gemma_bridge_session_send_json(GemmaBridgeSession* session,
     *response_json = g_last_response_json.c_str();
   }
   litert_lm_json_response_delete(response);
+  DebugLogSession("send_json_success", session, std::strlen(message_json));
   return 0;
 #else
   (void)session;
@@ -388,6 +594,7 @@ int gemma_bridge_session_send_json(GemmaBridgeSession* session,
   }
   return 1;
 #endif
+  }
 }
 
 void gemma_bridge_session_cancel(GemmaBridgeSession* session) {

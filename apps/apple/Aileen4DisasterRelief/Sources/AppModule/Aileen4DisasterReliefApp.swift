@@ -8,6 +8,9 @@ struct Aileen4DisasterReliefApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .task {
+                    await OverlayAutomationLab.runIfRequested()
+                }
         }
     }
 }

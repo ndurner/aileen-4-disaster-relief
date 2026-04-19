@@ -37,7 +37,7 @@ enum MediaToolingError: LocalizedError {
     }
 }
 
-final class AppleMediaTooling {
+final class AppleMediaTooling: @unchecked Sendable {
     static let imageCanvasSize = CGSize(width: 1080, height: 1350)
     static let reelCanvasSize = CGSize(width: 1080, height: 1920)
 
@@ -47,6 +47,9 @@ final class AppleMediaTooling {
         let kind: MediaAsset.Kind
         let canvasSize: CGSize
         let preferredImageFileType: ImageFileType?
+        let overlayFingerprint: String?
+        let baseAssetID: String?
+        let latestOverlayRequest: OverlayRequest?
     }
 
     private enum ImageFileType {
@@ -77,19 +80,26 @@ final class AppleMediaTooling {
         }
     }
 
-    private struct OverlaySpec {
-        let text: String
-        let rect: CGRect
-    }
-
     private var assets: [String: RenderedAsset]
     private var nextRenderedAssetIndex = 1
     private let outputKind: ProductionWorkflowViewModel.OutputKind
     private let renderCanvasSize: CGSize
+    private let protectedRegionProvider: OverlayProtectedRegionProvider
+    private let protectedRegionsOverride: OverlayProtectedRegions
+    private let layoutGuideOverride: OverlayLayoutGuide
 
-    init(sourceAssets: [ProductionAssetDescriptor], outputKind: ProductionWorkflowViewModel.OutputKind) {
+    init(
+        sourceAssets: [ProductionAssetDescriptor],
+        outputKind: ProductionWorkflowViewModel.OutputKind,
+        protectedRegionProvider: OverlayProtectedRegionProvider = .none,
+        protectedRegionsOverride: OverlayProtectedRegions = .empty,
+        layoutGuideOverride: OverlayLayoutGuide = .empty
+    ) {
         self.outputKind = outputKind
         self.renderCanvasSize = Self.renderCanvasSize(for: outputKind)
+        self.protectedRegionProvider = protectedRegionProvider
+        self.protectedRegionsOverride = protectedRegionsOverride
+        self.layoutGuideOverride = layoutGuideOverride
         self.assets = Dictionary(uniqueKeysWithValues: sourceAssets.map { descriptor in
             let size = Self.sourceCanvasSize(for: descriptor.mediaAsset)
             return (
@@ -99,7 +109,10 @@ final class AppleMediaTooling {
                     url: descriptor.mediaAsset.localCopyURL,
                     kind: descriptor.mediaAsset.kind,
                     canvasSize: size,
-                    preferredImageFileType: Self.imageFileType(for: descriptor.mediaAsset.localCopyURL)
+                    preferredImageFileType: Self.imageFileType(for: descriptor.mediaAsset.localCopyURL),
+                    overlayFingerprint: nil,
+                    baseAssetID: nil,
+                    latestOverlayRequest: nil
                 )
             )
         })
@@ -111,6 +124,10 @@ final class AppleMediaTooling {
             return try await composeVisuals(arguments: toolCall.arguments)
         case "add_text_overlay":
             return try await addTextOverlay(arguments: toolCall.arguments)
+        case "move_text_overlay":
+            return try await moveTextOverlay(arguments: toolCall.arguments)
+        case "accept_overlay_layout":
+            return try acceptOverlayLayout(arguments: toolCall.arguments)
         default:
             throw MediaToolingError.unsupportedTool(toolCall.name)
         }
@@ -146,45 +163,169 @@ final class AppleMediaTooling {
     }
 
     private func addTextOverlay(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
-        guard let assetID = arguments["asset_id"]?.stringValue,
-              let overlayText = arguments["overlay_text"]?.stringValue,
-              let x = arguments["x"]?.numberValue,
-              let y = arguments["y"]?.numberValue,
-              let width = arguments["width"]?.numberValue,
-              let height = arguments["height"]?.numberValue else {
-            throw MediaToolingError.invalidArguments("add_text_overlay requires asset_id, overlay_text, x, y, width, and height.")
+        guard let assetID = arguments["asset_id"]?.stringValue else {
+            throw MediaToolingError.invalidArguments("add_text_overlay requires asset_id and overlay_text.")
         }
 
         let asset = try resolveAsset(assetID)
-        let overlay = OverlaySpec(
-            text: overlayText,
-            rect: CGRect(x: x, y: y, width: width, height: height)
+        let requestedOverlay = try overlayRequest(
+            from: arguments,
+            defaultingTo: nil,
+            requireText: true
         )
+        let overlay = resolvedOverlayRequest(
+            from: requestedOverlay,
+            using: layoutGuideOverride,
+            canvasSize: asset.canvasSize
+        )
+        let protectedRegions = try protectedRegions(for: asset)
+        let resolvedOverlay = OverlayRendering.resolve(
+            overlay,
+            canvasSize: asset.canvasSize,
+            protectedRegions: protectedRegions
+        )
+        let overlayFingerprint = Self.overlayFingerprint(for: resolvedOverlay)
+        if asset.overlayFingerprint == overlayFingerprint {
+            return MediaToolResult(
+                name: "add_text_overlay",
+                payload: overlayPayload(
+                    status: "skipped_duplicate",
+                    renderedAsset: asset,
+                    sourceAssetID: asset.toolID,
+                    overlay: resolvedOverlay,
+                    accepted: false
+                ),
+                outputURL: asset.url
+            )
+        }
 
         let outputURL: URL
         switch asset.kind {
         case .image:
-            outputURL = try renderImageOverlay(on: asset, overlay: overlay)
+            outputURL = try renderImageOverlay(on: asset, overlay: resolvedOverlay)
         case .movie:
-            outputURL = try await renderVideoOverlay(on: asset, overlay: overlay)
+            outputURL = try await renderVideoOverlay(on: asset, overlay: resolvedOverlay)
         }
 
         let renderedAsset = registerRenderedAsset(
             url: outputURL,
             kind: asset.kind,
             canvasSize: asset.canvasSize,
-            preferredImageFileType: asset.preferredImageFileType
+            preferredImageFileType: asset.preferredImageFileType,
+            overlayFingerprint: overlayFingerprint,
+            baseAssetID: asset.toolID,
+            latestOverlayRequest: resolvedOverlay.request
         )
-        assets[assetID] = renderedAsset
         return MediaToolResult(
             name: "add_text_overlay",
-            payload: [
-                "status": "success",
-                "asset_id": renderedAsset.toolID,
-                "width": Int(renderedAsset.canvasSize.width),
-                "height": Int(renderedAsset.canvasSize.height)
-            ],
+            payload: overlayPayload(
+                status: "success",
+                renderedAsset: renderedAsset,
+                sourceAssetID: asset.toolID,
+                overlay: resolvedOverlay,
+                accepted: false
+            ),
             outputURL: renderedAsset.url
+        )
+    }
+
+    private func moveTextOverlay(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
+        guard let assetID = arguments["asset_id"]?.stringValue else {
+            throw MediaToolingError.invalidArguments("move_text_overlay requires asset_id.")
+        }
+
+        let currentAsset = try resolveAsset(assetID)
+        guard let previousOverlay = currentAsset.latestOverlayRequest else {
+            throw MediaToolingError.invalidArguments("move_text_overlay requires an asset with an existing overlay.")
+        }
+        let baseAssetID = currentAsset.baseAssetID ?? assetID
+        let baseAsset = try resolveAsset(baseAssetID)
+        let requestedOverlay = try overlayRequest(
+            from: arguments,
+            defaultingTo: previousOverlay,
+            requireText: false
+        )
+        let overlay = resolvedOverlayRequest(
+            from: requestedOverlay,
+            using: layoutGuideOverride,
+            canvasSize: baseAsset.canvasSize
+        )
+        let protectedRegions = try protectedRegions(for: baseAsset)
+        let resolvedOverlay = OverlayRendering.resolve(
+            overlay,
+            canvasSize: baseAsset.canvasSize,
+            protectedRegions: protectedRegions
+        )
+        let overlayFingerprint = Self.overlayFingerprint(for: resolvedOverlay)
+        if currentAsset.overlayFingerprint == overlayFingerprint {
+            return MediaToolResult(
+                name: "move_text_overlay",
+                payload: overlayPayload(
+                    status: "skipped_duplicate",
+                    renderedAsset: currentAsset,
+                    sourceAssetID: baseAsset.toolID,
+                    overlay: resolvedOverlay,
+                    accepted: false
+                ),
+                outputURL: currentAsset.url
+            )
+        }
+
+        let outputURL: URL
+        switch baseAsset.kind {
+        case .image:
+            outputURL = try renderImageOverlay(on: baseAsset, overlay: resolvedOverlay)
+        case .movie:
+            outputURL = try await renderVideoOverlay(on: baseAsset, overlay: resolvedOverlay)
+        }
+
+        let renderedAsset = registerRenderedAsset(
+            url: outputURL,
+            kind: baseAsset.kind,
+            canvasSize: baseAsset.canvasSize,
+            preferredImageFileType: baseAsset.preferredImageFileType,
+            overlayFingerprint: overlayFingerprint,
+            baseAssetID: baseAsset.toolID,
+            latestOverlayRequest: resolvedOverlay.request
+        )
+        return MediaToolResult(
+            name: "move_text_overlay",
+            payload: overlayPayload(
+                status: "success",
+                renderedAsset: renderedAsset,
+                sourceAssetID: baseAsset.toolID,
+                overlay: resolvedOverlay,
+                accepted: false
+            ),
+            outputURL: renderedAsset.url
+        )
+    }
+
+    private func acceptOverlayLayout(arguments: [String: LiteRTToolValue]) throws -> MediaToolResult {
+        guard let assetID = arguments["asset_id"]?.stringValue else {
+            throw MediaToolingError.invalidArguments("accept_overlay_layout requires asset_id.")
+        }
+        let asset = try resolveAsset(assetID)
+        return MediaToolResult(
+            name: "accept_overlay_layout",
+            payload: [
+                "status": "accepted",
+                "asset_id": asset.toolID,
+                "accepted": true
+            ],
+            outputURL: nil
+        )
+    }
+
+    private func resolvedOverlayRequest(
+        from request: OverlayRequest,
+        using guide: OverlayLayoutGuide,
+        canvasSize: CGSize
+    ) -> OverlayRequest {
+        OverlayLayoutGuidance.requestByApplyingGuide(
+            request,
+            guide: guide,
+            canvasSize: canvasSize
         )
     }
 
@@ -195,7 +336,15 @@ final class AppleMediaTooling {
         return asset
     }
 
-    private func registerRenderedAsset(url: URL, kind: MediaAsset.Kind, canvasSize: CGSize, preferredImageFileType: ImageFileType?) -> RenderedAsset {
+    private func registerRenderedAsset(
+        url: URL,
+        kind: MediaAsset.Kind,
+        canvasSize: CGSize,
+        preferredImageFileType: ImageFileType?,
+        overlayFingerprint: String? = nil,
+        baseAssetID: String? = nil,
+        latestOverlayRequest: OverlayRequest? = nil
+    ) -> RenderedAsset {
         let toolID = "rendered_\(nextRenderedAssetIndex)"
         nextRenderedAssetIndex += 1
         let renderedAsset = RenderedAsset(
@@ -203,10 +352,127 @@ final class AppleMediaTooling {
             url: url,
             kind: kind,
             canvasSize: canvasSize,
-            preferredImageFileType: preferredImageFileType
+            preferredImageFileType: preferredImageFileType,
+            overlayFingerprint: overlayFingerprint,
+            baseAssetID: baseAssetID,
+            latestOverlayRequest: latestOverlayRequest
         )
         assets[toolID] = renderedAsset
         return renderedAsset
+    }
+
+    private func overlayPayload(
+        status: String,
+        renderedAsset: RenderedAsset,
+        sourceAssetID: String,
+        overlay: ResolvedOverlay,
+        accepted: Bool
+    ) -> [String: Any] {
+        let canvasWidth = max(renderedAsset.canvasSize.width, 1)
+        let canvasHeight = max(renderedAsset.canvasSize.height, 1)
+        return [
+            "status": status,
+            "asset_id": renderedAsset.toolID,
+            "source_asset_id": sourceAssetID,
+            "accepted": accepted,
+            "style": overlay.style.rawValue,
+            "x": Int(overlay.frame.minX.rounded()),
+            "y": Int(overlay.frame.minY.rounded()),
+            "overlay_width": Int(overlay.frame.width.rounded()),
+            "overlay_height": Int(overlay.frame.height.rounded()),
+            "resolved_left_fraction": Double(overlay.frame.minX / canvasWidth),
+            "resolved_top_fraction": Double(overlay.frame.minY / canvasHeight),
+            "resolved_width_fraction": Double(overlay.frame.width / canvasWidth),
+            "resolved_height_fraction": Double(overlay.frame.height / canvasHeight),
+            "resolved_center_x_fraction": Double(overlay.frame.midX / canvasWidth),
+            "subject_overlap_fraction": Double(overlay.subjectOverlapFraction),
+            "avoidance_overlap_fraction": Double(overlay.avoidanceOverlapFraction),
+            "canvas_width": Int(renderedAsset.canvasSize.width),
+            "canvas_height": Int(renderedAsset.canvasSize.height)
+        ]
+    }
+
+    private func overlayRequest(
+        from arguments: [String: LiteRTToolValue],
+        defaultingTo previous: OverlayRequest?,
+        requireText: Bool
+    ) throws -> OverlayRequest {
+        let overlayText = arguments["overlay_text"]?.stringValue ?? previous?.text
+        guard let overlayText, !overlayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MediaToolingError.invalidArguments(requireText ? "Overlay text is required." : "move_text_overlay requires existing overlay text or a new overlay_text.")
+        }
+
+        let style = arguments["style"]?.stringValue.flatMap { OverlayStyle(rawValue: $0) } ?? previous?.style ?? .auto
+        let horizontalAnchor = arguments["horizontal_anchor"]?.stringValue.flatMap { OverlayHorizontalAnchor(rawValue: $0) } ?? previous?.horizontalAnchor ?? .center
+        let verticalAnchor = arguments["vertical_anchor"]?.stringValue.flatMap { OverlayVerticalAnchor(rawValue: $0) } ?? previous?.verticalAnchor ?? .top
+        let explicitRectFields = ["x", "y", "width", "height"]
+        let hasNormalizedOverride = arguments["top_fraction"] != nil || arguments["max_width_fraction"] != nil || arguments["target_line_count"] != nil
+        let providedExplicitRectFields = Set(explicitRectFields.filter { arguments[$0] != nil })
+        let hasExplicitRectOverride = !providedExplicitRectFields.isEmpty
+        let hasCompleteExplicitRectOverride = providedExplicitRectFields.count == explicitRectFields.count
+        let canReusePriorRect = previous?.rect.width ?? 0 > 0 && previous?.rect.height ?? 0 > 0
+        let shouldUseExplicitRect = !hasNormalizedOverride && (hasCompleteExplicitRectOverride || (hasExplicitRectOverride && canReusePriorRect))
+
+        let rect: CGRect
+        if shouldUseExplicitRect {
+            let priorRect = previous?.rect ?? .zero
+            rect = CGRect(
+                x: arguments["x"]?.numberValue ?? priorRect.minX,
+                y: arguments["y"]?.numberValue ?? priorRect.minY,
+                width: arguments["width"]?.numberValue ?? priorRect.width,
+                height: arguments["height"]?.numberValue ?? priorRect.height
+            )
+        } else if hasNormalizedOverride {
+            rect = .zero
+        } else {
+            rect = previous?.rect ?? .zero
+        }
+
+        let topFraction = shouldUseExplicitRect
+            ? nil
+            : arguments["top_fraction"]?.numberValue.map { CGFloat($0) } ?? previous?.topFraction
+        let maxWidthFraction = shouldUseExplicitRect
+            ? previous?.maxWidthFraction
+            : arguments["max_width_fraction"]?.numberValue.map { CGFloat($0) } ?? previous?.maxWidthFraction
+        let targetLineCount = arguments["target_line_count"]?.numberValue.map { Int($0.rounded()) } ?? previous?.targetLineCount
+
+        return OverlayRequest(
+            text: overlayText,
+            rect: rect,
+            style: style,
+            topFraction: topFraction,
+            maxWidthFraction: maxWidthFraction,
+            targetLineCount: targetLineCount,
+            horizontalAnchor: horizontalAnchor,
+            verticalAnchor: verticalAnchor
+        )
+    }
+
+    private func protectedRegions(for asset: RenderedAsset) throws -> OverlayProtectedRegions {
+        if !protectedRegionsOverride.isEmpty {
+            return protectedRegionsOverride
+        }
+        switch protectedRegionProvider {
+        case .none:
+            return .empty
+        case .appleVision:
+            let previewImage = try previewImage(for: asset)
+            return OverlaySubjectAnalysis.protectedRegions(
+                for: previewImage,
+                canvasSize: asset.canvasSize
+            )
+        }
+    }
+
+    private static func overlayFingerprint(for overlay: ResolvedOverlay) -> String {
+        [
+            overlay.style.rawValue,
+            overlay.request.text,
+            String(format: "%.3f", overlay.frame.minX),
+            String(format: "%.3f", overlay.frame.minY),
+            String(format: "%.3f", overlay.frame.width),
+            String(format: "%.3f", overlay.frame.height)
+        ].joined(separator: "|")
     }
 
     private func renderImageMontage(from sourceAssets: [RenderedAsset], canvasSize: CGSize, fileType: ImageFileType) throws -> URL {
@@ -226,16 +492,16 @@ final class AppleMediaTooling {
         return outputURL
     }
 
-    private func renderImageOverlay(on asset: RenderedAsset, overlay: OverlaySpec) throws -> URL {
+    private func renderImageOverlay(on asset: RenderedAsset, overlay: ResolvedOverlay) throws -> URL {
         guard let image = UIImage(contentsOfFile: asset.url.path) else {
             throw MediaToolingError.imageLoadFailed("Unable to load image asset \(asset.toolID).")
         }
         let fileType = asset.preferredImageFileType ?? .jpeg
         let outputURL = outputURL(for: fileType.pathExtension)
         let renderer = UIGraphicsImageRenderer(size: asset.canvasSize, format: Self.rendererFormat())
-        let rendered = renderer.image { _ in
+        let rendered = renderer.image { context in
             image.draw(in: CGRect(origin: .zero, size: asset.canvasSize))
-            Self.drawOverlay(overlay, in: asset.canvasSize)
+            OverlayRendering.draw(overlay, in: context.cgContext)
         }
 
         try writeImage(rendered, to: outputURL, fileType: fileType)
@@ -306,13 +572,13 @@ final class AppleMediaTooling {
         return outputURL
     }
 
-    private func renderVideoOverlay(on asset: RenderedAsset, overlay: OverlaySpec) async throws -> URL {
+    private func renderVideoOverlay(on asset: RenderedAsset, overlay: ResolvedOverlay) async throws -> URL {
         let sourceAsset = AVURLAsset(url: asset.url)
         guard sourceAsset.tracks(withMediaType: .video).first != nil else {
             throw MediaToolingError.videoTrackMissing("No video track found for \(asset.toolID).")
         }
 
-        guard let overlayCGImage = Self.overlayImage(for: overlay, canvasSize: asset.canvasSize).cgImage else {
+        guard let overlayCGImage = Self.overlayImage(for: overlay, canvasSize: asset.canvasSize) else {
             throw MediaToolingError.imageLoadFailed("Unable to render overlay image for \(asset.toolID).")
         }
         let overlayImage = CIImage(cgImage: overlayCGImage)
@@ -491,33 +757,6 @@ final class AppleMediaTooling {
         image.draw(in: Self.aspectFillRect(for: image.size, in: frame))
     }
 
-    private static func drawOverlay(_ overlay: OverlaySpec, in canvasSize: CGSize) {
-        let boxRect = overlay.rect.intersection(CGRect(origin: .zero, size: canvasSize))
-        guard !boxRect.isNull, !boxRect.isEmpty else { return }
-
-        let boxPath = UIBezierPath(roundedRect: boxRect, cornerRadius: min(24, boxRect.height * 0.2))
-        UIColor(white: 1.0, alpha: 0.94).setFill()
-        boxPath.fill()
-
-        let fontSize = max(20, min(52, boxRect.height * 0.34))
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-        paragraphStyle.lineBreakMode = .byWordWrapping
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
-            .foregroundColor: UIColor.black,
-            .paragraphStyle: paragraphStyle
-        ]
-
-        let insetRect = boxRect.insetBy(dx: max(14, boxRect.width * 0.04), dy: max(10, boxRect.height * 0.12))
-        NSAttributedString(string: overlay.text, attributes: attributes).draw(
-            with: insetRect,
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            context: nil
-        )
-    }
-
     private static func montageFrames(count: Int, canvasSize: CGSize) -> [CGRect] {
         switch count {
         case 1:
@@ -567,10 +806,10 @@ final class AppleMediaTooling {
         }
     }
 
-    private static func makeOverlayLayer(for overlay: OverlaySpec, canvasSize: CGSize) -> CALayer {
+    private static func makeOverlayLayer(for overlay: ResolvedOverlay, canvasSize: CGSize) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: canvasSize)
-        if let cgImage = overlayImage(for: overlay, canvasSize: canvasSize).cgImage {
+        if let cgImage = overlayImage(for: overlay, canvasSize: canvasSize) {
             container.contents = cgImage
         }
 
@@ -605,11 +844,8 @@ final class AppleMediaTooling {
         return CGRect(origin: origin, size: scaledSize)
     }
 
-    private static func overlayImage(for overlay: OverlaySpec, canvasSize: CGSize) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: transparentRendererFormat())
-        return renderer.image { _ in
-            drawOverlay(overlay, in: canvasSize)
-        }
+    private static func overlayImage(for overlay: ResolvedOverlay, canvasSize: CGSize) -> CGImage? {
+        OverlayRendering.makeOverlayCGImage(for: overlay, canvasSize: canvasSize)
     }
 
     private static func makePixelBuffer(from image: UIImage, canvasSize: CGSize) -> CVPixelBuffer? {

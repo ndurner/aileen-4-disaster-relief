@@ -22,6 +22,23 @@ GemmaBridgeSession* gemma_bridge_session_create_with_tools(
     const char* model_path,
     const char* tools_json,
     const char** error_message);
+GemmaBridgeSession* gemma_bridge_session_create_with_system_and_tools(
+    const char* model_path,
+    const char* system_message_json,
+    const char* tools_json,
+    const char** error_message);
+int gemma_bridge_session_recreate_conversation(GemmaBridgeSession* session,
+                                               const char* system_message_json,
+                                               const char* tools_json,
+                                               const char** error_message);
+int gemma_bridge_session_recreate_conversation_with_history(
+    GemmaBridgeSession* session,
+    const char* system_message_json,
+    const char* tools_json,
+    const char* messages_json,
+    const char** error_message);
+void gemma_bridge_session_set_extra_context(GemmaBridgeSession* session,
+                                            const char* extra_context_json);
 void gemma_bridge_session_destroy(GemmaBridgeSession* session);
 int gemma_bridge_session_stream(GemmaBridgeSession* session,
                                 const char* prompt,

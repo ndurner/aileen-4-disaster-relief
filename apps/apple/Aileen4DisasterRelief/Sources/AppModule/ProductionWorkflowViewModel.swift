@@ -8,6 +8,18 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class ProductionWorkflowViewModel: ObservableObject {
+    private struct ProductionOverlayPreparation {
+        let promptAddendum: String?
+        let protectedRegions: OverlayProtectedRegions
+        let layoutGuide: OverlayLayoutGuide
+
+        static let empty = ProductionOverlayPreparation(
+            promptAddendum: nil,
+            protectedRegions: .empty,
+            layoutGuide: .empty
+        )
+    }
+
     enum OutputKind: String, CaseIterable, Identifiable {
         case image
         case reel
@@ -30,9 +42,12 @@ final class ProductionWorkflowViewModel: ObservableObject {
         subsystem: Bundle.main.bundleIdentifier ?? "Aileen4DisasterRelief",
         category: "ProductionWorkflow"
     )
+    private static let thinkingExtraContextJSON = ProductionToolSchema.stringify(["enable_thinking": true])
+    private static let productionOverlayThinkingEnabled = true
+    private static let productionGuideProvider: OverlayLayoutGuideProvider = .gemmaVision
+    private static let productionGuidanceMode: OverlayLayoutGuidanceMode = .band
 
     private let locator = ModelLocator()
-    private let toolEngine = GemmaToolCallingEngine()
     private let postBodyRunner = GemmaTextRunner()
     private var nextCameraRollAssetNumber = 1
     private var nextImportedFileNumber = 1
@@ -90,15 +105,37 @@ final class ProductionWorkflowViewModel: ObservableObject {
             }
 
             let productionAssets = makeProductionAssets()
-            let contentPrompt = makeProductionPrompt(backgroundBriefing: backgroundBriefing, story: story, productionAssets: productionAssets)
-            let toolResult = try await toolEngine.run(
-                initialPrompt: contentPrompt,
+            let visualRunner = GemmaTextRunner()
+            let overlayPreparation = await makeProductionOverlayPreparation(
+                productionAssets: productionAssets,
                 modelURL: visualURL,
-                sourceAssets: productionAssets,
-                outputKind: outputKind
+                runner: visualRunner
             )
+            let toolEngine = GemmaToolCallingEngine(runner: visualRunner)
+            let contentPrompt = makeProductionPrompt(
+                backgroundBriefing: backgroundBriefing,
+                story: story,
+                productionAssets: productionAssets,
+                supplementalAddendum: overlayPreparation.promptAddendum
+            )
+            let toolResult: ToolExecutionResult
+            do {
+                toolResult = try await toolEngine.run(
+                    initialPrompt: contentPrompt,
+                    modelURL: visualURL,
+                    sourceAssets: productionAssets,
+                    outputKind: outputKind,
+                    enableThinking: Self.productionOverlayThinkingEnabled,
+                    protectedRegionProvider: .none,
+                    protectedRegionsOverride: overlayPreparation.protectedRegions,
+                    layoutGuideOverride: overlayPreparation.layoutGuide
+                )
+            } catch {
+                await visualRunner.destroySession()
+                throw error
+            }
             logToolCalls(toolResult.toolCalls)
-            productionSummary = toolResult.finalText
+            productionSummary = productionSummary(for: toolResult)
             producedURLs = toolResult.producedURLs
 
             let textAvailability = locator.resolve(textModel, sourcePreference: modelSource)
@@ -106,12 +143,21 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 throw GemmaTextRunnerError.runtime(textAvailability.detail)
             }
 
-            try await postBodyRunner.makeToolSession(modelURL: textURL, toolsJSON: PostBodyToolSchema.toolsJSON)
-            defer { Task { await postBodyRunner.destroySession() } }
-            let postBodyPrompt = ProductionPrompts.postBodyPrompt(backgroundBriefing: backgroundBriefing, story: story, producedVisualSummary: productionSummary)
-            let parsed = try await postBodyRunner.sendJSON(ProductionToolSchema.userMessageJSON(text: postBodyPrompt, assets: productionAssets))
-            postBodyText = PostBodyToolSchema.extractPostBody(from: parsed)
-            shareItems = producedURLs + [postBodyText].filter { !$0.isEmpty }
+            try await postBodyRunner.makeToolSession(
+                modelURL: textURL,
+                toolsJSON: PostBodyToolSchema.toolsJSON,
+                extraContextJSON: Self.thinkingExtraContextJSON
+            )
+            do {
+                let postBodyPrompt = ProductionPrompts.postBodyPrompt(backgroundBriefing: backgroundBriefing, story: story, producedVisualSummary: productionSummary)
+                let parsed = try await postBodyRunner.sendJSON(ProductionToolSchema.userMessageJSON(text: postBodyPrompt, assets: productionAssets))
+                await postBodyRunner.destroySession()
+                postBodyText = PostBodyToolSchema.extractPostBody(from: parsed)
+                shareItems = producedURLs + [postBodyText].filter { !$0.isEmpty }
+            } catch {
+                await postBodyRunner.destroySession()
+                throw error
+            }
         } catch {
             latestError = error.localizedDescription
         }
@@ -164,14 +210,113 @@ final class ProductionWorkflowViewModel: ObservableObject {
         }
     }
 
-    private func makeProductionPrompt(backgroundBriefing: String, story: String, productionAssets: [ProductionAssetDescriptor]) -> String {
-        ProductionPrompts.productionPrompt(
+    private func makeProductionPrompt(
+        backgroundBriefing: String,
+        story: String,
+        productionAssets: [ProductionAssetDescriptor],
+        supplementalAddendum: String? = nil
+    ) -> String {
+        let basePrompt = ProductionPrompts.productionPrompt(
             backgroundBriefing: backgroundBriefing,
             story: story,
             outputKind: outputKind,
             assets: productionAssets,
             canvasSize: AppleMediaTooling.renderCanvasSize(for: outputKind)
         )
+
+        let trimmedAddendum = supplementalAddendum?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmedAddendum, !trimmedAddendum.isEmpty else {
+            return basePrompt
+        }
+
+        return """
+        \(basePrompt)
+
+        Additional production guidance:
+        \(trimmedAddendum)
+        """
+    }
+
+    private func makeProductionOverlayPreparation(
+        productionAssets: [ProductionAssetDescriptor],
+        modelURL: URL,
+        runner: GemmaTextRunner
+    ) async -> ProductionOverlayPreparation {
+        guard Self.productionGuideProvider != .none else {
+            return .empty
+        }
+
+        do {
+            let tooling = AppleMediaTooling(
+                sourceAssets: productionAssets,
+                outputKind: outputKind,
+                protectedRegionProvider: .none
+            )
+            let composeResult = try await tooling.execute(
+                toolCall: LiteRTToolCall(
+                    name: "compose_visuals",
+                    arguments: [
+                        "asset_ids": .array(productionAssets.map { .string($0.toolID) })
+                    ]
+                )
+            )
+            guard let renderedURL = composeResult.outputURL else {
+                return .empty
+            }
+
+            let analysis = try await GemmaOverlayVision.analyzeDetailed(
+                renderedURL: renderedURL,
+                modelURL: modelURL,
+                enableThinking: Self.productionOverlayThinkingEnabled,
+                runner: runner
+            )
+            let canvasSize = AppleMediaTooling.renderCanvasSize(for: outputKind)
+            let protectedRegions = OverlayLayoutGuidance.protectedRegions(
+                from: analysis.guide,
+                canvasSize: canvasSize
+            )
+            let layoutGuide: OverlayLayoutGuide
+            if protectedRegions.isEmpty {
+                layoutGuide = .empty
+            } else {
+                layoutGuide = OverlayLayoutGuidance.makeGuide(
+                    provider: analysis.guide.provider == .none ? Self.productionGuideProvider : analysis.guide.provider,
+                    protectedRegions: protectedRegions,
+                    canvasSize: canvasSize
+                )
+            }
+
+            return ProductionOverlayPreparation(
+                promptAddendum: OverlayLayoutGuidance.promptAddendum(
+                    for: analysis.guide,
+                    canvasSize: canvasSize,
+                    mode: Self.productionGuidanceMode
+                ),
+                protectedRegions: protectedRegions,
+                layoutGuide: layoutGuide
+            )
+        } catch {
+            Self.logger.error("Gemma overlay pre-analysis failed; continuing without guidance: \(error.localizedDescription, privacy: .public)")
+            await runner.destroySession()
+            return .empty
+        }
+    }
+
+    private func productionSummary(for toolResult: ToolExecutionResult) -> String {
+        let visibleText = toolResult.finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !visibleText.isEmpty {
+            return visibleText
+        }
+
+        let overlayActions = toolResult.toolCalls.filter {
+            $0.name == "add_text_overlay" || $0.name == "move_text_overlay"
+        }
+
+        if overlayActions.isEmpty {
+            return "Produced a publication-ready \(outputKind.rawValue) without a text overlay."
+        }
+
+        return "Produced a publication-ready \(outputKind.rawValue) with a single text overlay."
     }
 
     private func assetStorageDirectory() throws -> URL {
@@ -242,6 +387,7 @@ enum ProductionPrompts {
 
         Available media assets:
         - \(assetList.isEmpty ? "(none selected)" : assetList)
+        If images or video previews are attached, they appear in the same order as the asset list above.
 
         Output canvas:
         \(Int(canvasSize.width)) x \(Int(canvasSize.height)) pixels
@@ -257,10 +403,44 @@ enum ProductionPrompts {
         Use only those exact asset IDs in tool calls. Never use file paths, filenames, display names, UUIDs, or guessed IDs.
         First call compose_visuals with one or more source asset IDs.
         Then, only if the media clearly benefits from it, call add_text_overlay on the returned rendered asset ID.
+        After you see a rendered overlay preview, you may either:
+        - call move_text_overlay on that rendered asset ID to materially reposition or restyle the latest overlay without stacking another one, or
+        - call accept_overlay_layout on that rendered asset ID when the current result is good as-is.
         Use as many overlays as needed when they clearly improve the result, but keep each overlay purposeful and compact.
         Keep overlay text short enough to read comfortably on mobile.
         If you call add_text_overlay more than once, always use the most recently returned rendered asset ID so overlays accumulate correctly.
-        x, y, width, and height are pixel values in the output canvas.
+        Prefer revising a weak first overlay with move_text_overlay instead of adding another overlay just to compensate.
+        Use the style field simply:
+        - sticker: the default Instagram-like rounded text card with a clear background; use this for almost all overlay text
+        - tag: a smaller dark pill for short handles, labels, or secondary callouts
+        - headline and caption are legacy aliases and render like sticker, so prefer sticker instead of those names
+        - auto: only when you genuinely do not have a style preference
+        Default to one overlay. Add a second overlay only when it is a genuine handle or location label and clearly improves the result.
+        Prefer concrete wording grounded in what is visible, but do not anchor the overlay box itself to the main subject. Avoid filler text such as "nature", "wild beauty", "quiet moments", or "golden hour moment" unless the visible scene specifically supports it.
+        Choose style from composition:
+        - Prefer sticker for the main text almost always, including subject-dominant frames and open-scenery frames.
+        - Use tag only for genuinely short labels such as a location, handle, or secondary marker.
+        After compose_visuals, pay attention to the returned rendered preview. Base overlay placement on that rendered frame, not only on the original source asset, because the rendered canvas may crop or reframe the source media.
+        Placement rule: the overlay should usually live in free space around the subject, not next to the subject's face, body, or main silhouette. Do not place the overlay near the subject just because the subject is the focus of the image.
+        Prefer empty sky, water, pavement, wall area, or a clear frame edge over space that hugs the subject.
+        If the subject is central or tall, prefer a lower band or an outer side band instead of a box that sits close to the subject.
+        If the image is a close-up with a single central subject and limited negative space, strongly prefer one lower sticker band around 0.48 to 0.62 top_fraction instead of an upper sticker.
+        Prefer the normalized overlay hints over raw pixel guesses:
+        - Use top_fraction for vertical placement when you do not need an explicit slot. Good defaults are 0.18 to 0.35 for upper sticker placement and 0.45 to 0.60 for lower sticker placement.
+        - Use max_width_fraction to express how wide the overlay may become after wrapping. Good defaults are roughly 0.38 to 0.68 depending on text length and style.
+        - Use target_line_count so the renderer can measure width from the text itself. Good defaults are 1 or 2 for sticker, and 1 for tag.
+        - Use horizontal_anchor to prefer left, center, or right placement without hard-coding a final box.
+        - In normalized mode, do not also guess raw x, y, width, or height. Use one approach or the other.
+        If you can see a clean free area in the rendered frame, you may instead describe a slot:
+        - Provide x, y, width, and height as the available slot in the output canvas.
+        - Then use horizontal_anchor and vertical_anchor to place the measured overlay inside that slot, often centered horizontally and bottom-aligned vertically.
+        - In slot mode, do not assume the final overlay will fill the entire slot; the renderer will size it from the wrapped text.
+        - Prefer slots that are clearly separated from the subject, not slots that merely touch or flank the subject tightly.
+        Use x, y, width, and height only when you intentionally want to bound a slot. Otherwise prefer normalized hints.
+        Overlay coordinates always resolve in the output canvas, not in the raw source image dimensions.
+        Do not use full-canvas width for overlays.
+        Keep overlays out of the top app-chrome band. Prefer the first sticker roughly 18% to 35% down from the top, or 45% to 60% down from the top when a lower placement is cleaner.
+        If the rendered preview still looks too close to the subject, too boring, or too banner-like, revise it with move_text_overlay rather than defending a weak placement.
         Keep tool responses concise and produce a publication-ready result.
         """
     }

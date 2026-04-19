@@ -71,6 +71,7 @@ resources_group = app_group.new_group("Resources", "Aileen4DisasterRelief/Resour
 support_group = app_group.new_group("Support", "Aileen4DisasterRelief/Support")
 sources_group = main_group.new_group("Sources", "Aileen4DisasterRelief/Sources")
 appmodule_group = sources_group.new_group("AppModule", "AppModule")
+overlay_lab_group = sources_group.new_group("OverlayLab", "OverlayLab")
 bridge_group = sources_group.new_group("LiteRTLMBridge", "LiteRTLMBridge")
 
 Dir.children(File.join(ROOT, "Aileen4DisasterRelief", "Sources", "AppModule"))
@@ -78,6 +79,15 @@ Dir.children(File.join(ROOT, "Aileen4DisasterRelief", "Sources", "AppModule"))
   .sort
   .each do |filename|
   reference = appmodule_group.new_file("Aileen4DisasterRelief/Sources/AppModule/#{filename}")
+  reference.source_tree = "SOURCE_ROOT"
+  app_target.add_file_references([reference])
+end
+
+Dir.children(File.join(ROOT, "Aileen4DisasterRelief", "Sources", "OverlayLab"))
+  .select { |filename| filename.end_with?(".swift") }
+  .sort
+  .each do |filename|
+  reference = overlay_lab_group.new_file("Aileen4DisasterRelief/Sources/OverlayLab/#{filename}")
   reference.source_tree = "SOURCE_ROOT"
   app_target.add_file_references([reference])
 end
