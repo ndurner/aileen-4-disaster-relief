@@ -49,6 +49,7 @@ struct OceanScreen<Content: View>: View {
     let title: String?
     let subtitle: String?
     private let content: Content
+    private let maxContentWidth: CGFloat = 720
 
     init(
         eyebrow: String? = nil,
@@ -70,6 +71,8 @@ struct OceanScreen<Content: View>: View {
                 }
                 content
             }
+            .frame(maxWidth: maxContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 20)
             .padding(.top, 20)
             .padding(.bottom, 152)
@@ -318,13 +321,22 @@ struct AileenSceneArtwork: View {
     var cornerRadius: CGFloat = 28
 
     var body: some View {
-        Image(imageName)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .accessibilityHidden(true)
+        Group {
+            if ProcessInfo.processInfo.isiOSAppOnMac {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+            } else {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 
