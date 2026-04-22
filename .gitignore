@@ -36,3 +36,4 @@ apps/apple/ThirdParty/GoogleAIEdge/*
 *.log
 
 apps/apple/build
+scratch
