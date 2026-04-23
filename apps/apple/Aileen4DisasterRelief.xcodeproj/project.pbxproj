@@ -7,44 +7,51 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01B4E3C48126F9D4F5E3439A /* OverlayVisionGuidance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9132FF6FAA38D93D4BBC3754 /* OverlayVisionGuidance.swift */; };
-		1D328CE7083F614F6C75B9B2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5AD6637DD5A5CC4AFC3480B /* AppState.swift */; };
-		28CF5A9130E5B6FFFB62FCCD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 62882BBDEB9ACC2011E4C204 /* Assets.xcassets */; };
-		4141F4BFF447083864C09BD1 /* ContentProductionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7ADC6B952A1052972DD917 /* ContentProductionView.swift */; };
-		494412727BA4ECADC51D6CA3 /* LiteRTLM.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E9C1864012FE6C01064B64E /* LiteRTLM.xcframework */; };
-		50669A7D92DEE85F82C12F9E /* LiteRTLMBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 17BDE9024494CD30085F3A2A /* LiteRTLMBridge.mm */; };
-		57C34B0C12C4954F811D8FA7 /* ProductionWorkflowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C70728E6CC5E3CE96974AAE /* ProductionWorkflowViewModel.swift */; };
-		5B91798A9904808875D1517A /* AutomationLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB0C8282593A5F25702B943 /* AutomationLab.swift */; };
-		5D1F36C7FA9ADBC734CF98BE /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51899BE9FA2E06F910BE62A4 /* ShareSheet.swift */; };
-		5D375133A7C4E136C3531AB9 /* GemmaToolCallingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8991A46F3F73F3B6A2375E0C /* GemmaToolCallingEngine.swift */; };
-		62227DE34C99A13BAFBF0B10 /* OverlayCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C93D0B377A7A34FB20DC11F /* OverlayCore.swift */; };
-		7D83639CBD9FE1D921D27027 /* ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D983855E9E67549BB0ABF8C /* ModelCatalog.swift */; };
-		966297E6C43106DB5FCEC91F /* Aileen4DisasterReliefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC72460C07CF63C1A179123 /* Aileen4DisasterReliefApp.swift */; };
-		967BF162706D115A48995005 /* OverlaySubjectAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241B33A3959181B0B85EB19B /* OverlaySubjectAnalysis.swift */; };
-		98CBC4B9AA60063BDAA0D6C3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268193DE8A7CDEBD6C0DFDEC /* ContentView.swift */; };
-		9C28C4CBC490E0524F188154 /* LiteRTResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B64E77496AF57FCEF7370E45 /* LiteRTResponseParser.swift */; };
-		9CA724938F20E44F87ABB02E /* GemmaModelConstraintProvider.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F310B9D59D63A47A28DBDD50 /* GemmaModelConstraintProvider.xcframework */; };
-		A1401AA7067FEE5AD7F6F673 /* MediaAsset.swift in Sources */ = {isa = PBXBuildFile; fileRef = A737D760B2A225F55A9BF90E /* MediaAsset.swift */; };
-		A7D40E68DD5C400825B62406 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4582F89F8A4743FBEA80823C /* Foundation.framework */; };
-		ADF9CBE504D30B3B51E19403 /* MediaTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72D52A4918FCC2A3BF25A05 /* MediaTooling.swift */; };
-		B3228F91479FB0FEFB23EBC2 /* GemmaModelConstraintProvider.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F310B9D59D63A47A28DBDD50 /* GemmaModelConstraintProvider.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		B39DE4F1E0F5A6305E08EC55 /* BackgroundBriefingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE583C1627A7A1C7C32515ED /* BackgroundBriefingView.swift */; };
-		C83B999970FB5E185A70755F /* OceanDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC53D7DDC90F33D21834CDFF /* OceanDesign.swift */; };
-		D7F58245FF6DBFD6E387C964 /* LiteRtMetalAccelerator.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 911F49F452FCC0B1217AC7B3 /* LiteRtMetalAccelerator.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E2D2AE56E98DA7C6BC11B689 /* LiteRtMetalAccelerator.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 911F49F452FCC0B1217AC7B3 /* LiteRtMetalAccelerator.xcframework */; };
-		E8E8F007071688F69CAE76FB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8B6F26C6F6A9E61EB1A187 /* SettingsView.swift */; };
-		FA6AE4E3981B0A532A4582C0 /* GemmaTextRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F50CC3F8DE492EBD20BEAB /* GemmaTextRunner.swift */; };
+		103B3773857D37D465511093 /* OceanDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AF1DC710CB2BA1CF7EAE531 /* OceanDesign.swift */; };
+		2155D427045AF2B67900C00A /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B62E42871248958F708BF0C /* ShareSheet.swift */; };
+		224F683AB2720FC7F413F6EA /* AutomationLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A53C2AF0B8A7DC5C8AD53A1C /* AutomationLab.swift */; };
+		2434C70078931F4FC12E7C82 /* ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82025BF318BACCBAADF9B90D /* ModelCatalog.swift */; };
+		3F9D5B29ED190CAD28AE7D4B /* GemmaModelConstraintProvider.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F889DA70A3ACAAF5921D341 /* GemmaModelConstraintProvider.xcframework */; };
+		433C50524C8D5D1530713BA5 /* GemmaModelConstraintProvider.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8F889DA70A3ACAAF5921D341 /* GemmaModelConstraintProvider.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		47E8C69EFC487CB24020DBA8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 665D3F8EDE30215A8CFEF07C /* SettingsView.swift */; };
+		4BFE03DEECA2FA345E0A2A0A /* OverlayCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE317D07102486DED9925795 /* OverlayCore.swift */; };
+		540E5D3EC4817DCDB24FCE77 /* MediaTooling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBDBD8B0D678BBF742B8C59 /* MediaTooling.swift */; };
+		550AD0589EFC844A482E3023 /* LiteRTLM.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 298E42839E3D5FB93C83A880 /* LiteRTLM.xcframework */; };
+		5AC0E131DEACA5527D063BAB /* LiteRTMessageParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8CDB4C39DB5E7E2EB789F0 /* LiteRTMessageParser.swift */; };
+		709AD5BCA7D097CADBDA9A26 /* OverlayVisionGuidance.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB7B88B52F4DB41CA4B08A0 /* OverlayVisionGuidance.swift */; };
+		801E8A388B0B9F80D5D1DA33 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 730FD855ED6DB7E81034DA3F /* ContentView.swift */; };
+		94363A1175D211D06DB768F9 /* BackgroundBriefingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B6A3769D62161FF67D9AF /* BackgroundBriefingView.swift */; };
+		9BBDAEC9FFCE701A9341F583 /* OverlaySubjectAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA6FE0FB3DD147476566B67 /* OverlaySubjectAnalysis.swift */; };
+		A5496FD7EA299A4DA5922391 /* MediaAsset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE7D25405B1CC4C34D60FC10 /* MediaAsset.swift */; };
+		A6B0119A2F9F780329F8AB16 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECF14BF8E8738CC778B815D /* AppState.swift */; };
+		B85A29021B6EFACF6B8CEFE1 /* GoogleAIStudioResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFE0B98C6B10BF660342F8EE /* GoogleAIStudioResponseParser.swift */; };
+		BBDDAC367D63ED4EAEE8F849 /* ContentProductionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50373563DE776404C4A06079 /* ContentProductionView.swift */; };
+		BD3A2EE9B0B76BFD2A2C2A43 /* LiteRtMetalAccelerator.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = FAC1A583AC967B595C6FC67C /* LiteRtMetalAccelerator.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BD73BAFEA691C7923E0A4BA2 /* LiteRtMetalAccelerator.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAC1A583AC967B595C6FC67C /* LiteRtMetalAccelerator.xcframework */; };
+		C31C12F2731923B5AE0DA860 /* LiteRTLMBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3383AAF6359C8639B8289B01 /* LiteRTLMBridge.mm */; };
+		C6C4A52C1501E782E12B8015 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B6EC92334976F089188177FD /* Foundation.framework */; };
+		C8B10B41386DE481D6724FAE /* LiteRTResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D0E2A5E75022CB2488F79B /* LiteRTResponseParser.swift */; };
+		C9D892C0E100D6D88A5A96A8 /* Aileen4DisasterReliefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB66D7B985F1A8705D257CF /* Aileen4DisasterReliefApp.swift */; };
+		D24B58924B331AADB540A9FA /* PromptMediaEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FD56EF77C2CA5044C03A71 /* PromptMediaEncoder.swift */; };
+		DB71591A4EBA9AB9BDA21947 /* GemmaToolCallingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3106D7089A9622E31FE61CB /* GemmaToolCallingEngine.swift */; };
+		DCFB3CF3179E93857A3BB0F1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 87372A71CE63C1D1276E43B8 /* Assets.xcassets */; };
+		E411BF1066B447500822D397 /* GoogleAIStudioClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608C0D905ED182CBEBFE4BAE /* GoogleAIStudioClient.swift */; };
+		EA6B0150D0F9710656D8E615 /* GoogleAIStudioOverlayVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F55C7AEBB95DE7EBC17798 /* GoogleAIStudioOverlayVision.swift */; };
+		EE263F3E82E1450FE4AAC242 /* ProductionWorkflowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E3AD1DD23D2A6BDD7E287A6 /* ProductionWorkflowViewModel.swift */; };
+		F4FA6B037FAF91150345B1C3 /* GoogleAIStudioAPIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E2547DDC4F27D8D3083C15 /* GoogleAIStudioAPIKeyStore.swift */; };
+		F534487AC856C539F59CCCA9 /* GoogleAIStudioToolCallingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB03CF196FA62DE97FF5068 /* GoogleAIStudioToolCallingEngine.swift */; };
+		FD4E659BB315FFD746C0D049 /* GemmaTextRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96E0EF6FE217E831389A77C /* GemmaTextRunner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		7F7659C7552857478DD20C73 /* Embed Frameworks */ = {
+		E9998093557E3849D6206D36 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				B3228F91479FB0FEFB23EBC2 /* GemmaModelConstraintProvider.xcframework in Embed Frameworks */,
-				D7F58245FF6DBFD6E387C964 /* LiteRtMetalAccelerator.xcframework in Embed Frameworks */,
+				433C50524C8D5D1530713BA5 /* GemmaModelConstraintProvider.xcframework in Embed Frameworks */,
+				BD3A2EE9B0B76BFD2A2C2A43 /* LiteRtMetalAccelerator.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -52,190 +59,204 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		01F50CC3F8DE492EBD20BEAB /* GemmaTextRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GemmaTextRunner.swift; path = Aileen4DisasterRelief/Sources/AppModule/GemmaTextRunner.swift; sourceTree = SOURCE_ROOT; };
-		17BDE9024494CD30085F3A2A /* LiteRTLMBridge.mm */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRTLMBridge.mm; path = Aileen4DisasterRelief/Sources/LiteRTLMBridge/LiteRTLMBridge.mm; sourceTree = SOURCE_ROOT; };
-		1D8B6F26C6F6A9E61EB1A187 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Aileen4DisasterRelief/Sources/AppModule/SettingsView.swift; sourceTree = SOURCE_ROOT; };
-		1D983855E9E67549BB0ABF8C /* ModelCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ModelCatalog.swift; path = Aileen4DisasterRelief/Sources/AppModule/ModelCatalog.swift; sourceTree = SOURCE_ROOT; };
-		241B33A3959181B0B85EB19B /* OverlaySubjectAnalysis.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlaySubjectAnalysis.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlaySubjectAnalysis.swift; sourceTree = SOURCE_ROOT; };
-		268193DE8A7CDEBD6C0DFDEC /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Aileen4DisasterRelief/Sources/AppModule/ContentView.swift; sourceTree = SOURCE_ROOT; };
-		2C70728E6CC5E3CE96974AAE /* ProductionWorkflowViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProductionWorkflowViewModel.swift; path = Aileen4DisasterRelief/Sources/AppModule/ProductionWorkflowViewModel.swift; sourceTree = SOURCE_ROOT; };
-		4582F89F8A4743FBEA80823C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		4E9C1864012FE6C01064B64E /* LiteRTLM.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRTLM.xcframework; path = ThirdParty/GoogleAIEdge/LiteRTLM.xcframework; sourceTree = SOURCE_ROOT; };
-		51899BE9FA2E06F910BE62A4 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = Aileen4DisasterRelief/Sources/AppModule/ShareSheet.swift; sourceTree = SOURCE_ROOT; };
-		62882BBDEB9ACC2011E4C204 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Aileen4DisasterRelief/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
-		7C93D0B377A7A34FB20DC11F /* OverlayCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlayCore.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlayCore.swift; sourceTree = SOURCE_ROOT; };
-		8991A46F3F73F3B6A2375E0C /* GemmaToolCallingEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GemmaToolCallingEngine.swift; path = Aileen4DisasterRelief/Sources/AppModule/GemmaToolCallingEngine.swift; sourceTree = SOURCE_ROOT; };
-		911F49F452FCC0B1217AC7B3 /* LiteRtMetalAccelerator.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRtMetalAccelerator.xcframework; path = ThirdParty/GoogleAIEdge/LiteRtMetalAccelerator.xcframework; sourceTree = SOURCE_ROOT; };
-		9132FF6FAA38D93D4BBC3754 /* OverlayVisionGuidance.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlayVisionGuidance.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlayVisionGuidance.swift; sourceTree = SOURCE_ROOT; };
-		953473CD2BE9E677D420A697 /* Aileen4DisasterRelief.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Aileen4DisasterRelief.app; path = Aileen4DisasterRelief.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A737D760B2A225F55A9BF90E /* MediaAsset.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaAsset.swift; path = Aileen4DisasterRelief/Sources/AppModule/MediaAsset.swift; sourceTree = SOURCE_ROOT; };
-		AE7ADC6B952A1052972DD917 /* ContentProductionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentProductionView.swift; path = Aileen4DisasterRelief/Sources/AppModule/ContentProductionView.swift; sourceTree = SOURCE_ROOT; };
-		B64E77496AF57FCEF7370E45 /* LiteRTResponseParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiteRTResponseParser.swift; path = Aileen4DisasterRelief/Sources/AppModule/LiteRTResponseParser.swift; sourceTree = SOURCE_ROOT; };
-		BC53D7DDC90F33D21834CDFF /* OceanDesign.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OceanDesign.swift; path = Aileen4DisasterRelief/Sources/AppModule/OceanDesign.swift; sourceTree = SOURCE_ROOT; };
-		C5AD6637DD5A5CC4AFC3480B /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Aileen4DisasterRelief/Sources/AppModule/AppState.swift; sourceTree = SOURCE_ROOT; };
-		DCC72460C07CF63C1A179123 /* Aileen4DisasterReliefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Aileen4DisasterReliefApp.swift; path = Aileen4DisasterRelief/Sources/AppModule/Aileen4DisasterReliefApp.swift; sourceTree = SOURCE_ROOT; };
-		DE583C1627A7A1C7C32515ED /* BackgroundBriefingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackgroundBriefingView.swift; path = Aileen4DisasterRelief/Sources/AppModule/BackgroundBriefingView.swift; sourceTree = SOURCE_ROOT; };
-		E72D52A4918FCC2A3BF25A05 /* MediaTooling.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaTooling.swift; path = Aileen4DisasterRelief/Sources/AppModule/MediaTooling.swift; sourceTree = SOURCE_ROOT; };
-		F310B9D59D63A47A28DBDD50 /* GemmaModelConstraintProvider.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = GemmaModelConstraintProvider.xcframework; path = ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework; sourceTree = SOURCE_ROOT; };
-		FF4427D208D3D65820B173DF /* Aileen4DisasterRelief-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = "Aileen4DisasterRelief-Bridging-Header.h"; path = "Aileen4DisasterRelief/Support/Aileen4DisasterRelief-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
-		FFB0C8282593A5F25702B943 /* AutomationLab.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AutomationLab.swift; path = Aileen4DisasterRelief/Sources/OverlayLab/AutomationLab.swift; sourceTree = SOURCE_ROOT; };
+		1E3AD1DD23D2A6BDD7E287A6 /* ProductionWorkflowViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProductionWorkflowViewModel.swift; path = Aileen4DisasterRelief/Sources/AppModule/ProductionWorkflowViewModel.swift; sourceTree = SOURCE_ROOT; };
+		298E42839E3D5FB93C83A880 /* LiteRTLM.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRTLM.xcframework; path = ThirdParty/GoogleAIEdge/LiteRTLM.xcframework; sourceTree = SOURCE_ROOT; };
+		3383AAF6359C8639B8289B01 /* LiteRTLMBridge.mm */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRTLMBridge.mm; path = Aileen4DisasterRelief/Sources/LiteRTLMBridge/LiteRTLMBridge.mm; sourceTree = SOURCE_ROOT; };
+		3FBDBD8B0D678BBF742B8C59 /* MediaTooling.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaTooling.swift; path = Aileen4DisasterRelief/Sources/AppModule/MediaTooling.swift; sourceTree = SOURCE_ROOT; };
+		44D0E2A5E75022CB2488F79B /* LiteRTResponseParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiteRTResponseParser.swift; path = Aileen4DisasterRelief/Sources/AppModule/LiteRTResponseParser.swift; sourceTree = SOURCE_ROOT; };
+		4B62E42871248958F708BF0C /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = Aileen4DisasterRelief/Sources/AppModule/ShareSheet.swift; sourceTree = SOURCE_ROOT; };
+		4FB66D7B985F1A8705D257CF /* Aileen4DisasterReliefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Aileen4DisasterReliefApp.swift; path = Aileen4DisasterRelief/Sources/AppModule/Aileen4DisasterReliefApp.swift; sourceTree = SOURCE_ROOT; };
+		50373563DE776404C4A06079 /* ContentProductionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentProductionView.swift; path = Aileen4DisasterRelief/Sources/AppModule/ContentProductionView.swift; sourceTree = SOURCE_ROOT; };
+		5AF1DC710CB2BA1CF7EAE531 /* OceanDesign.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OceanDesign.swift; path = Aileen4DisasterRelief/Sources/AppModule/OceanDesign.swift; sourceTree = SOURCE_ROOT; };
+		5CB03CF196FA62DE97FF5068 /* GoogleAIStudioToolCallingEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoogleAIStudioToolCallingEngine.swift; path = Aileen4DisasterRelief/Sources/AppModule/GoogleAIStudioToolCallingEngine.swift; sourceTree = SOURCE_ROOT; };
+		608C0D905ED182CBEBFE4BAE /* GoogleAIStudioClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoogleAIStudioClient.swift; path = Aileen4DisasterRelief/Sources/AppModule/GoogleAIStudioClient.swift; sourceTree = SOURCE_ROOT; };
+		665D3F8EDE30215A8CFEF07C /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Aileen4DisasterRelief/Sources/AppModule/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		730FD855ED6DB7E81034DA3F /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Aileen4DisasterRelief/Sources/AppModule/ContentView.swift; sourceTree = SOURCE_ROOT; };
+		82025BF318BACCBAADF9B90D /* ModelCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ModelCatalog.swift; path = Aileen4DisasterRelief/Sources/AppModule/ModelCatalog.swift; sourceTree = SOURCE_ROOT; };
+		87372A71CE63C1D1276E43B8 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Aileen4DisasterRelief/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		8EA6FE0FB3DD147476566B67 /* OverlaySubjectAnalysis.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlaySubjectAnalysis.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlaySubjectAnalysis.swift; sourceTree = SOURCE_ROOT; };
+		8F889DA70A3ACAAF5921D341 /* GemmaModelConstraintProvider.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = GemmaModelConstraintProvider.xcframework; path = ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework; sourceTree = SOURCE_ROOT; };
+		A3763462197BC67DED91985C /* Aileen4DisasterRelief-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = "Aileen4DisasterRelief-Bridging-Header.h"; path = "Aileen4DisasterRelief/Support/Aileen4DisasterRelief-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+		A3FD56EF77C2CA5044C03A71 /* PromptMediaEncoder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PromptMediaEncoder.swift; path = Aileen4DisasterRelief/Sources/AppModule/PromptMediaEncoder.swift; sourceTree = SOURCE_ROOT; };
+		A53C2AF0B8A7DC5C8AD53A1C /* AutomationLab.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AutomationLab.swift; path = Aileen4DisasterRelief/Sources/OverlayLab/AutomationLab.swift; sourceTree = SOURCE_ROOT; };
+		A96E0EF6FE217E831389A77C /* GemmaTextRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GemmaTextRunner.swift; path = Aileen4DisasterRelief/Sources/AppModule/GemmaTextRunner.swift; sourceTree = SOURCE_ROOT; };
+		AB8CDB4C39DB5E7E2EB789F0 /* LiteRTMessageParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiteRTMessageParser.swift; path = Aileen4DisasterRelief/Sources/AppModule/LiteRTMessageParser.swift; sourceTree = SOURCE_ROOT; };
+		B6EC92334976F089188177FD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		BA2FC6FD3C1CAB4F78C87A37 /* Aileen4DisasterRelief.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Aileen4DisasterRelief.app; path = Aileen4DisasterRelief.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BD1B6A3769D62161FF67D9AF /* BackgroundBriefingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BackgroundBriefingView.swift; path = Aileen4DisasterRelief/Sources/AppModule/BackgroundBriefingView.swift; sourceTree = SOURCE_ROOT; };
+		BE7D25405B1CC4C34D60FC10 /* MediaAsset.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MediaAsset.swift; path = Aileen4DisasterRelief/Sources/AppModule/MediaAsset.swift; sourceTree = SOURCE_ROOT; };
+		C3106D7089A9622E31FE61CB /* GemmaToolCallingEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GemmaToolCallingEngine.swift; path = Aileen4DisasterRelief/Sources/AppModule/GemmaToolCallingEngine.swift; sourceTree = SOURCE_ROOT; };
+		C5E2547DDC4F27D8D3083C15 /* GoogleAIStudioAPIKeyStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoogleAIStudioAPIKeyStore.swift; path = Aileen4DisasterRelief/Sources/AppModule/GoogleAIStudioAPIKeyStore.swift; sourceTree = SOURCE_ROOT; };
+		CFE0B98C6B10BF660342F8EE /* GoogleAIStudioResponseParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoogleAIStudioResponseParser.swift; path = Aileen4DisasterRelief/Sources/AppModule/GoogleAIStudioResponseParser.swift; sourceTree = SOURCE_ROOT; };
+		D0F55C7AEBB95DE7EBC17798 /* GoogleAIStudioOverlayVision.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoogleAIStudioOverlayVision.swift; path = Aileen4DisasterRelief/Sources/AppModule/GoogleAIStudioOverlayVision.swift; sourceTree = SOURCE_ROOT; };
+		EECF14BF8E8738CC778B815D /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Aileen4DisasterRelief/Sources/AppModule/AppState.swift; sourceTree = SOURCE_ROOT; };
+		FAC1A583AC967B595C6FC67C /* LiteRtMetalAccelerator.xcframework */ = {isa = PBXFileReference; includeInIndex = 1; name = LiteRtMetalAccelerator.xcframework; path = ThirdParty/GoogleAIEdge/LiteRtMetalAccelerator.xcframework; sourceTree = SOURCE_ROOT; };
+		FE317D07102486DED9925795 /* OverlayCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlayCore.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlayCore.swift; sourceTree = SOURCE_ROOT; };
+		FFB7B88B52F4DB41CA4B08A0 /* OverlayVisionGuidance.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OverlayVisionGuidance.swift; path = Aileen4DisasterRelief/Sources/AppModule/OverlayVisionGuidance.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		E0883AB59FA8BEDEC8066FD9 /* Frameworks */ = {
+		018BF3E00E111296EEB05207 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A7D40E68DD5C400825B62406 /* Foundation.framework in Frameworks */,
-				494412727BA4ECADC51D6CA3 /* LiteRTLM.xcframework in Frameworks */,
-				9CA724938F20E44F87ABB02E /* GemmaModelConstraintProvider.xcframework in Frameworks */,
-				E2D2AE56E98DA7C6BC11B689 /* LiteRtMetalAccelerator.xcframework in Frameworks */,
+				C6C4A52C1501E782E12B8015 /* Foundation.framework in Frameworks */,
+				550AD0589EFC844A482E3023 /* LiteRTLM.xcframework in Frameworks */,
+				3F9D5B29ED190CAD28AE7D4B /* GemmaModelConstraintProvider.xcframework in Frameworks */,
+				BD73BAFEA691C7923E0A4BA2 /* LiteRtMetalAccelerator.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		081B6CEE885A1880B1C31E66 = {
+		0360878C94CAAA6EB7654393 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				0DFDC458051DD0C4E3C32F9B /* Products */,
-				A7AA7866744F66B5BA20A5E6 /* Frameworks */,
-				ED0BB13CA7699E215B79CC26 /* Aileen4DisasterRelief */,
-				5748CB90360B4E546BF5F5AA /* Sources */,
-				378CD8948335DA06E5DACF3A /* GoogleAIEdge */,
-			);
-			sourceTree = "<group>";
-		};
-		0DFDC458051DD0C4E3C32F9B /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				953473CD2BE9E677D420A697 /* Aileen4DisasterRelief.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		378CD8948335DA06E5DACF3A /* GoogleAIEdge */ = {
-			isa = PBXGroup;
-			children = (
-				4E9C1864012FE6C01064B64E /* LiteRTLM.xcframework */,
-				F310B9D59D63A47A28DBDD50 /* GemmaModelConstraintProvider.xcframework */,
-				911F49F452FCC0B1217AC7B3 /* LiteRtMetalAccelerator.xcframework */,
-			);
-			name = GoogleAIEdge;
-			path = ThirdParty/GoogleAIEdge;
-			sourceTree = "<group>";
-		};
-		5748CB90360B4E546BF5F5AA /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				FEF38DE7D131F4C406ED272D /* AppModule */,
-				7E62303323927FFE42E34D75 /* OverlayLab */,
-				8119D286B9D87B151219800B /* LiteRTLMBridge */,
-			);
-			name = Sources;
-			path = Aileen4DisasterRelief/Sources;
-			sourceTree = "<group>";
-		};
-		7E62303323927FFE42E34D75 /* OverlayLab */ = {
-			isa = PBXGroup;
-			children = (
-				FFB0C8282593A5F25702B943 /* AutomationLab.swift */,
-			);
-			name = OverlayLab;
-			path = OverlayLab;
-			sourceTree = "<group>";
-		};
-		8119D286B9D87B151219800B /* LiteRTLMBridge */ = {
-			isa = PBXGroup;
-			children = (
-				17BDE9024494CD30085F3A2A /* LiteRTLMBridge.mm */,
-			);
-			name = LiteRTLMBridge;
-			path = LiteRTLMBridge;
-			sourceTree = "<group>";
-		};
-		8D3611CB1D7B258CD99C028C /* Support */ = {
-			isa = PBXGroup;
-			children = (
-				FF4427D208D3D65820B173DF /* Aileen4DisasterRelief-Bridging-Header.h */,
-			);
-			name = Support;
-			path = Aileen4DisasterRelief/Support;
-			sourceTree = "<group>";
-		};
-		A7AA7866744F66B5BA20A5E6 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				AD066ED4F85CD51EEBC7841C /* iOS */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		AD066ED4F85CD51EEBC7841C /* iOS */ = {
-			isa = PBXGroup;
-			children = (
-				4582F89F8A4743FBEA80823C /* Foundation.framework */,
-			);
-			name = iOS;
-			sourceTree = "<group>";
-		};
-		B05781A2743E2E99577D91B2 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				62882BBDEB9ACC2011E4C204 /* Assets.xcassets */,
+				87372A71CE63C1D1276E43B8 /* Assets.xcassets */,
 			);
 			name = Resources;
 			path = Aileen4DisasterRelief/Resources;
 			sourceTree = "<group>";
 		};
-		ED0BB13CA7699E215B79CC26 /* Aileen4DisasterRelief */ = {
+		065A84D7A9482EDE2D72F8C4 /* LiteRTLMBridge */ = {
 			isa = PBXGroup;
 			children = (
-				B05781A2743E2E99577D91B2 /* Resources */,
-				8D3611CB1D7B258CD99C028C /* Support */,
+				3383AAF6359C8639B8289B01 /* LiteRTLMBridge.mm */,
 			);
-			name = Aileen4DisasterRelief;
-			path = Aileen4DisasterRelief;
+			name = LiteRTLMBridge;
+			path = LiteRTLMBridge;
 			sourceTree = "<group>";
 		};
-		FEF38DE7D131F4C406ED272D /* AppModule */ = {
+		27584A19991DEB3F6D6A5B24 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				DCC72460C07CF63C1A179123 /* Aileen4DisasterReliefApp.swift */,
-				C5AD6637DD5A5CC4AFC3480B /* AppState.swift */,
-				DE583C1627A7A1C7C32515ED /* BackgroundBriefingView.swift */,
-				AE7ADC6B952A1052972DD917 /* ContentProductionView.swift */,
-				268193DE8A7CDEBD6C0DFDEC /* ContentView.swift */,
-				01F50CC3F8DE492EBD20BEAB /* GemmaTextRunner.swift */,
-				8991A46F3F73F3B6A2375E0C /* GemmaToolCallingEngine.swift */,
-				B64E77496AF57FCEF7370E45 /* LiteRTResponseParser.swift */,
-				A737D760B2A225F55A9BF90E /* MediaAsset.swift */,
-				E72D52A4918FCC2A3BF25A05 /* MediaTooling.swift */,
-				1D983855E9E67549BB0ABF8C /* ModelCatalog.swift */,
-				BC53D7DDC90F33D21834CDFF /* OceanDesign.swift */,
-				7C93D0B377A7A34FB20DC11F /* OverlayCore.swift */,
-				241B33A3959181B0B85EB19B /* OverlaySubjectAnalysis.swift */,
-				9132FF6FAA38D93D4BBC3754 /* OverlayVisionGuidance.swift */,
-				2C70728E6CC5E3CE96974AAE /* ProductionWorkflowViewModel.swift */,
-				1D8B6F26C6F6A9E61EB1A187 /* SettingsView.swift */,
-				51899BE9FA2E06F910BE62A4 /* ShareSheet.swift */,
+				BA2FC6FD3C1CAB4F78C87A37 /* Aileen4DisasterRelief.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		321204B52E1528B9D6733C88 = {
+			isa = PBXGroup;
+			children = (
+				27584A19991DEB3F6D6A5B24 /* Products */,
+				F7A91A9E399BA0E1DA92A1B4 /* Frameworks */,
+				B983AB7F12F43C40CAED52C4 /* Aileen4DisasterRelief */,
+				48511B402CAEB81F9EC9F7C5 /* Sources */,
+				B1A214BC60A79E870B2D77D0 /* GoogleAIEdge */,
+			);
+			sourceTree = "<group>";
+		};
+		48511B402CAEB81F9EC9F7C5 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				6C0DC0931ECD955AAB7D2FD6 /* AppModule */,
+				DC83DAB74B95B8669C119E6F /* OverlayLab */,
+				065A84D7A9482EDE2D72F8C4 /* LiteRTLMBridge */,
+			);
+			name = Sources;
+			path = Aileen4DisasterRelief/Sources;
+			sourceTree = "<group>";
+		};
+		6C0DC0931ECD955AAB7D2FD6 /* AppModule */ = {
+			isa = PBXGroup;
+			children = (
+				4FB66D7B985F1A8705D257CF /* Aileen4DisasterReliefApp.swift */,
+				EECF14BF8E8738CC778B815D /* AppState.swift */,
+				BD1B6A3769D62161FF67D9AF /* BackgroundBriefingView.swift */,
+				50373563DE776404C4A06079 /* ContentProductionView.swift */,
+				730FD855ED6DB7E81034DA3F /* ContentView.swift */,
+				A96E0EF6FE217E831389A77C /* GemmaTextRunner.swift */,
+				C3106D7089A9622E31FE61CB /* GemmaToolCallingEngine.swift */,
+				C5E2547DDC4F27D8D3083C15 /* GoogleAIStudioAPIKeyStore.swift */,
+				608C0D905ED182CBEBFE4BAE /* GoogleAIStudioClient.swift */,
+				D0F55C7AEBB95DE7EBC17798 /* GoogleAIStudioOverlayVision.swift */,
+				CFE0B98C6B10BF660342F8EE /* GoogleAIStudioResponseParser.swift */,
+				5CB03CF196FA62DE97FF5068 /* GoogleAIStudioToolCallingEngine.swift */,
+				AB8CDB4C39DB5E7E2EB789F0 /* LiteRTMessageParser.swift */,
+				44D0E2A5E75022CB2488F79B /* LiteRTResponseParser.swift */,
+				BE7D25405B1CC4C34D60FC10 /* MediaAsset.swift */,
+				3FBDBD8B0D678BBF742B8C59 /* MediaTooling.swift */,
+				82025BF318BACCBAADF9B90D /* ModelCatalog.swift */,
+				5AF1DC710CB2BA1CF7EAE531 /* OceanDesign.swift */,
+				FE317D07102486DED9925795 /* OverlayCore.swift */,
+				8EA6FE0FB3DD147476566B67 /* OverlaySubjectAnalysis.swift */,
+				FFB7B88B52F4DB41CA4B08A0 /* OverlayVisionGuidance.swift */,
+				1E3AD1DD23D2A6BDD7E287A6 /* ProductionWorkflowViewModel.swift */,
+				A3FD56EF77C2CA5044C03A71 /* PromptMediaEncoder.swift */,
+				665D3F8EDE30215A8CFEF07C /* SettingsView.swift */,
+				4B62E42871248958F708BF0C /* ShareSheet.swift */,
 			);
 			name = AppModule;
 			path = AppModule;
 			sourceTree = "<group>";
 		};
+		6C1DB4B579F2FEC732990047 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				A3763462197BC67DED91985C /* Aileen4DisasterRelief-Bridging-Header.h */,
+			);
+			name = Support;
+			path = Aileen4DisasterRelief/Support;
+			sourceTree = "<group>";
+		};
+		943912371F53380DEE616A08 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				B6EC92334976F089188177FD /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		B1A214BC60A79E870B2D77D0 /* GoogleAIEdge */ = {
+			isa = PBXGroup;
+			children = (
+				298E42839E3D5FB93C83A880 /* LiteRTLM.xcframework */,
+				8F889DA70A3ACAAF5921D341 /* GemmaModelConstraintProvider.xcframework */,
+				FAC1A583AC967B595C6FC67C /* LiteRtMetalAccelerator.xcframework */,
+			);
+			name = GoogleAIEdge;
+			path = ThirdParty/GoogleAIEdge;
+			sourceTree = "<group>";
+		};
+		B983AB7F12F43C40CAED52C4 /* Aileen4DisasterRelief */ = {
+			isa = PBXGroup;
+			children = (
+				0360878C94CAAA6EB7654393 /* Resources */,
+				6C1DB4B579F2FEC732990047 /* Support */,
+			);
+			name = Aileen4DisasterRelief;
+			path = Aileen4DisasterRelief;
+			sourceTree = "<group>";
+		};
+		DC83DAB74B95B8669C119E6F /* OverlayLab */ = {
+			isa = PBXGroup;
+			children = (
+				A53C2AF0B8A7DC5C8AD53A1C /* AutomationLab.swift */,
+			);
+			name = OverlayLab;
+			path = OverlayLab;
+			sourceTree = "<group>";
+		};
+		F7A91A9E399BA0E1DA92A1B4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				943912371F53380DEE616A08 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		365AD6C9C4ADEDD2C6278478 /* Aileen4DisasterRelief */ = {
+		72F235A4F11AC909477AB9A3 /* Aileen4DisasterRelief */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 267060B8C9EBA7A7BFEA69FC /* Build configuration list for PBXNativeTarget "Aileen4DisasterRelief" */;
+			buildConfigurationList = A4C49D1E02CDCF18BB452FCC /* Build configuration list for PBXNativeTarget "Aileen4DisasterRelief" */;
 			buildPhases = (
-				E5C22BE2EE71DCA1BE43FAE4 /* Sources */,
-				E0883AB59FA8BEDEC8066FD9 /* Frameworks */,
-				C692B636A6285B5BD152DB68 /* Resources */,
-				7F7659C7552857478DD20C73 /* Embed Frameworks */,
+				95F6C7B5F397C27A24EA2E76 /* Sources */,
+				018BF3E00E111296EEB05207 /* Frameworks */,
+				9DD63287BCC9D6FC9F5AB59E /* Resources */,
+				E9998093557E3849D6206D36 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -243,25 +264,25 @@
 			);
 			name = Aileen4DisasterRelief;
 			productName = Aileen4DisasterRelief;
-			productReference = 953473CD2BE9E677D420A697 /* Aileen4DisasterRelief.app */;
+			productReference = BA2FC6FD3C1CAB4F78C87A37 /* Aileen4DisasterRelief.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		251C9E321DD0D522A746477F /* Project object */ = {
+		63085BF20A0327EC17EB5242 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					365AD6C9C4ADEDD2C6278478 = {
+					72F235A4F11AC909477AB9A3 = {
 						DevelopmentTeam = FSYXWNUDDW;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 41A4C491344BA890019A2965 /* Build configuration list for PBXProject "Aileen4DisasterRelief" */;
+			buildConfigurationList = EDF373B168A1281E6E730114 /* Build configuration list for PBXProject "Aileen4DisasterRelief" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -269,115 +290,68 @@
 				en,
 				Base,
 			);
-			mainGroup = 081B6CEE885A1880B1C31E66;
+			mainGroup = 321204B52E1528B9D6733C88;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 0DFDC458051DD0C4E3C32F9B /* Products */;
+			productRefGroup = 27584A19991DEB3F6D6A5B24 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				365AD6C9C4ADEDD2C6278478 /* Aileen4DisasterRelief */,
+				72F235A4F11AC909477AB9A3 /* Aileen4DisasterRelief */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C692B636A6285B5BD152DB68 /* Resources */ = {
+		9DD63287BCC9D6FC9F5AB59E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				28CF5A9130E5B6FFFB62FCCD /* Assets.xcassets in Resources */,
+				DCFB3CF3179E93857A3BB0F1 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E5C22BE2EE71DCA1BE43FAE4 /* Sources */ = {
+		95F6C7B5F397C27A24EA2E76 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				966297E6C43106DB5FCEC91F /* Aileen4DisasterReliefApp.swift in Sources */,
-				1D328CE7083F614F6C75B9B2 /* AppState.swift in Sources */,
-				B39DE4F1E0F5A6305E08EC55 /* BackgroundBriefingView.swift in Sources */,
-				4141F4BFF447083864C09BD1 /* ContentProductionView.swift in Sources */,
-				98CBC4B9AA60063BDAA0D6C3 /* ContentView.swift in Sources */,
-				FA6AE4E3981B0A532A4582C0 /* GemmaTextRunner.swift in Sources */,
-				5D375133A7C4E136C3531AB9 /* GemmaToolCallingEngine.swift in Sources */,
-				9C28C4CBC490E0524F188154 /* LiteRTResponseParser.swift in Sources */,
-				A1401AA7067FEE5AD7F6F673 /* MediaAsset.swift in Sources */,
-				ADF9CBE504D30B3B51E19403 /* MediaTooling.swift in Sources */,
-				7D83639CBD9FE1D921D27027 /* ModelCatalog.swift in Sources */,
-				C83B999970FB5E185A70755F /* OceanDesign.swift in Sources */,
-				62227DE34C99A13BAFBF0B10 /* OverlayCore.swift in Sources */,
-				967BF162706D115A48995005 /* OverlaySubjectAnalysis.swift in Sources */,
-				01B4E3C48126F9D4F5E3439A /* OverlayVisionGuidance.swift in Sources */,
-				57C34B0C12C4954F811D8FA7 /* ProductionWorkflowViewModel.swift in Sources */,
-				E8E8F007071688F69CAE76FB /* SettingsView.swift in Sources */,
-				5D1F36C7FA9ADBC734CF98BE /* ShareSheet.swift in Sources */,
-				5B91798A9904808875D1517A /* AutomationLab.swift in Sources */,
-				50669A7D92DEE85F82C12F9E /* LiteRTLMBridge.mm in Sources */,
+				C9D892C0E100D6D88A5A96A8 /* Aileen4DisasterReliefApp.swift in Sources */,
+				A6B0119A2F9F780329F8AB16 /* AppState.swift in Sources */,
+				94363A1175D211D06DB768F9 /* BackgroundBriefingView.swift in Sources */,
+				BBDDAC367D63ED4EAEE8F849 /* ContentProductionView.swift in Sources */,
+				801E8A388B0B9F80D5D1DA33 /* ContentView.swift in Sources */,
+				FD4E659BB315FFD746C0D049 /* GemmaTextRunner.swift in Sources */,
+				DB71591A4EBA9AB9BDA21947 /* GemmaToolCallingEngine.swift in Sources */,
+				F4FA6B037FAF91150345B1C3 /* GoogleAIStudioAPIKeyStore.swift in Sources */,
+				E411BF1066B447500822D397 /* GoogleAIStudioClient.swift in Sources */,
+				EA6B0150D0F9710656D8E615 /* GoogleAIStudioOverlayVision.swift in Sources */,
+				B85A29021B6EFACF6B8CEFE1 /* GoogleAIStudioResponseParser.swift in Sources */,
+				F534487AC856C539F59CCCA9 /* GoogleAIStudioToolCallingEngine.swift in Sources */,
+				5AC0E131DEACA5527D063BAB /* LiteRTMessageParser.swift in Sources */,
+				C8B10B41386DE481D6724FAE /* LiteRTResponseParser.swift in Sources */,
+				A5496FD7EA299A4DA5922391 /* MediaAsset.swift in Sources */,
+				540E5D3EC4817DCDB24FCE77 /* MediaTooling.swift in Sources */,
+				2434C70078931F4FC12E7C82 /* ModelCatalog.swift in Sources */,
+				103B3773857D37D465511093 /* OceanDesign.swift in Sources */,
+				4BFE03DEECA2FA345E0A2A0A /* OverlayCore.swift in Sources */,
+				9BBDAEC9FFCE701A9341F583 /* OverlaySubjectAnalysis.swift in Sources */,
+				709AD5BCA7D097CADBDA9A26 /* OverlayVisionGuidance.swift in Sources */,
+				EE263F3E82E1450FE4AAC242 /* ProductionWorkflowViewModel.swift in Sources */,
+				D24B58924B331AADB540A9FA /* PromptMediaEncoder.swift in Sources */,
+				47E8C69EFC487CB24020DBA8 /* SettingsView.swift in Sources */,
+				2155D427045AF2B67900C00A /* ShareSheet.swift in Sources */,
+				224F683AB2720FC7F413F6EA /* AutomationLab.swift in Sources */,
+				C31C12F2731923B5AE0DA860 /* LiteRTLMBridge.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		239F2B548DC4F595CC623F1B /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		B6EF41729EF9C9BE3D50256B /* Debug */ = {
+		341BB10D893E9F064A09550C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -425,7 +399,7 @@
 			};
 			name = Debug;
 		};
-		C393D4F4488C023F2FB73304 /* Debug */ = {
+		89D042FD0C73471CCCB1C098 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -486,7 +460,61 @@
 			};
 			name = Debug;
 		};
-		EFD1B1CD60D1AFB44F2E0306 /* Release */ = {
+		94C0CEB20E21BBD9B2BE2F84 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CA152138C536C7AA608A7577 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -538,25 +566,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		267060B8C9EBA7A7BFEA69FC /* Build configuration list for PBXNativeTarget "Aileen4DisasterRelief" */ = {
+		A4C49D1E02CDCF18BB452FCC /* Build configuration list for PBXNativeTarget "Aileen4DisasterRelief" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				EFD1B1CD60D1AFB44F2E0306 /* Release */,
-				B6EF41729EF9C9BE3D50256B /* Debug */,
+				CA152138C536C7AA608A7577 /* Release */,
+				341BB10D893E9F064A09550C /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		41A4C491344BA890019A2965 /* Build configuration list for PBXProject "Aileen4DisasterRelief" */ = {
+		EDF373B168A1281E6E730114 /* Build configuration list for PBXProject "Aileen4DisasterRelief" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C393D4F4488C023F2FB73304 /* Debug */,
-				239F2B548DC4F595CC623F1B /* Release */,
+				89D042FD0C73471CCCB1C098 /* Debug */,
+				94C0CEB20E21BBD9B2BE2F84 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 251C9E321DD0D522A746477F /* Project object */;
+	rootObject = 63085BF20A0327EC17EB5242 /* Project object */;
 }

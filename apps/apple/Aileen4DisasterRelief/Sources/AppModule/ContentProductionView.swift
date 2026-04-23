@@ -8,6 +8,24 @@ struct ContentProductionView: View {
     @State private var fileImporterPresented = false
     @State private var shareSheetPresented = false
 
+    private var cloudModeNeedsAPIKey: Bool {
+        appState.inferenceMode == .cloud && !appState.hasGoogleAIStudioAPIKey
+    }
+
+    private var productionStatusDetail: String {
+        if viewModel.isRunning {
+            return "Working"
+        }
+        if cloudModeNeedsAPIKey {
+            return "Google AI Studio key required"
+        }
+        return appState.inferenceMode == .cloud ? "Cloud ready" : "On-device ready"
+    }
+
+    private var hasProducedResults: Bool {
+        !viewModel.producedURLs.isEmpty || !viewModel.postBodyText.isEmpty
+    }
+
     var body: some View {
         OceanScreen {
             AileenWorkflowCard(
@@ -105,16 +123,21 @@ struct ContentProductionView: View {
             }
 
             OceanCard {
-                OceanSectionHeader(title: "Production", detail: viewModel.isRunning ? "Working" : "Ready")
+                OceanSectionHeader(title: "Production", detail: productionStatusDetail)
+
+                if cloudModeNeedsAPIKey {
+                    Text("Cloud inference is selected. Add your Google AI Studio API key in Settings before producing visuals and caption text.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Button {
                     Task {
                         await viewModel.run(
                             backgroundBriefing: appState.backgroundBriefing,
                             story: appState.story,
-                            visualModel: appState.selectedProductionModel,
-                            textModel: appState.selectedTextModel,
-                            modelSource: appState.preferredModelSource
+                            inference: appState.inferenceConfiguration
                         )
                     }
                 } label: {
@@ -130,7 +153,7 @@ struct ContentProductionView: View {
                     }
                 }
                 .buttonStyle(OceanPrimaryButtonStyle())
-                .disabled(viewModel.isRunning)
+                .disabled(viewModel.isRunning || cloudModeNeedsAPIKey)
             }
 
             if !viewModel.productionSummary.isEmpty {
@@ -152,6 +175,15 @@ struct ContentProductionView: View {
                         .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(OceanPalette.ink)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if hasProducedResults {
+                OceanCard {
+                    OceanSectionHeader(
+                        title: "Results",
+                        detail: viewModel.producedURLs.isEmpty ? "Text only" : "Ready to export"
+                    )
 
                     ViewThatFits {
                         HStack(spacing: 12) {
@@ -219,10 +251,14 @@ struct ContentProductionView: View {
             }
         }
         .buttonStyle(OceanSecondaryButtonStyle())
+        .disabled(viewModel.producedURLs.isEmpty && viewModel.postBodyText.isEmpty)
 
-        Button("Copy text") {
-            viewModel.copyPostBodyToPasteboard()
+        Button(viewModel.postBodyText.isEmpty ? "No text yet" : "Copy text") {
+            if !viewModel.postBodyText.isEmpty {
+                viewModel.copyPostBodyToPasteboard()
+            }
         }
         .buttonStyle(OceanSecondaryButtonStyle())
+        .disabled(viewModel.postBodyText.isEmpty)
     }
 }

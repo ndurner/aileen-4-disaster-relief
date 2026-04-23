@@ -1,17 +1,17 @@
 import Foundation
 
-enum ModelSourcePreference: String, CaseIterable, Identifiable {
-    case injected
-    case downloaded
+enum InferenceMode: String, CaseIterable, Identifiable {
+    case onDevice = "on_device"
+    case cloud
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .injected:
-            return "Injected"
-        case .downloaded:
-            return "Downloaded"
+        case .onDevice:
+            return "On-Device"
+        case .cloud:
+            return "Cloud"
         }
     }
 }
@@ -38,6 +38,48 @@ enum ModelOption: String, CaseIterable, Identifiable {
         case .e4bLiteRT:
             return "Post body generation"
         }
+    }
+}
+
+enum CloudModelOption: String, CaseIterable, Identifiable {
+    case gemma426bA4B = "gemma-4-26b-a4b-it"
+    case gemma431B = "gemma-4-31b-it"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .gemma426bA4B:
+            return "Gemma 4 26B A4B"
+        case .gemma431B:
+            return "Gemma 4 31B"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .gemma426bA4B:
+            return "Hosted Gemma 4 26B A4B via Google AI Studio and the Gemini API."
+        case .gemma431B:
+            return "Hosted Gemma 4 31B via Google AI Studio for higher-capacity cloud inference."
+        }
+    }
+
+    var requestModelIdentifier: String {
+        rawValue
+    }
+}
+
+struct InferenceConfiguration {
+    let mode: InferenceMode
+    let onDeviceVisualModel: ModelOption
+    let onDeviceTextModel: ModelOption
+    let cloudVisualModel: CloudModelOption
+    let cloudTextModel: CloudModelOption
+    let cloudAPIKey: String
+
+    var hasCloudAPIKey: Bool {
+        !cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
@@ -75,40 +117,36 @@ struct ModelLocator {
         return appSupport.appendingPathComponent("Models", isDirectory: true)
     }
 
-    private func downloadedModelsDirectory() -> URL {
+    private func importedModelsDirectoryURL() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DownloadedModels", isDirectory: true)
     }
 
-    func resolve(_ model: ModelOption, sourcePreference: ModelSourcePreference) -> ModelAvailability {
+    func resolve(_ model: ModelOption) -> ModelAvailability {
         do {
-            let injected = try applicationModelsDirectory().appendingPathComponent(model.rawValue, isDirectory: false)
-            let downloaded = downloadedModelsDirectory().appendingPathComponent(model.rawValue, isDirectory: false)
+            let injected = try applicationModelsDirectory()
+                .appendingPathComponent(model.rawValue, isDirectory: false)
+            let imported = importedModelsDirectoryURL()
+                .appendingPathComponent(model.rawValue, isDirectory: false)
 
-            let orderedCandidates: [(URL, String)] = switch sourcePreference {
-            case .injected:
-                [
-                    (injected, "Using injected model from Application Support/Models."),
-                    (downloaded, "Using downloaded model from Documents/DownloadedModels.")
-                ]
-            case .downloaded:
-                [
-                    (downloaded, "Using downloaded model from Documents/DownloadedModels."),
-                    (injected, "Using injected model from Application Support/Models.")
-                ]
-            }
+            let orderedCandidates: [(URL, String)] = [
+                (injected, "Available on device from Application Support/Models."),
+                (imported, "Available on device from imported Files storage.")
+            ]
 
             for (url, detail) in orderedCandidates where FileManager.default.fileExists(atPath: url.path) {
                 return .available(url, detail: detail)
             }
 
-            return .missing(detail: "Expected \(model.rawValue) in Application Support/Models or Documents/DownloadedModels. Inject it with the shared device script or import it in Settings.")
+            return .missing(
+                detail: "Expected \(model.rawValue) in Application Support/Models or the imported on-device model folder. Add it from Files in Settings or push it with the shared device script."
+            )
         } catch {
             return .missing(detail: "Unable to resolve model storage: \(error.localizedDescription)")
         }
     }
 
     func importedModelsDirectory() -> URL {
-        downloadedModelsDirectory()
+        importedModelsDirectoryURL()
     }
 }
