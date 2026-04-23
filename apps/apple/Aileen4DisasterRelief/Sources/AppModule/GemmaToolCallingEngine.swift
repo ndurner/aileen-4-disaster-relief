@@ -487,53 +487,13 @@ enum ProductionToolSchema {
 
         var parts: [[String: Any]] = []
         for asset in assets {
-            guard let promptBlob = try promptImageBlob(for: asset.mediaAsset) else { continue }
+            guard let promptBlob = try PromptMediaEncoder.promptImageBlob(for: asset.mediaAsset) else { continue }
             parts.append([
                 "type": "image",
                 "blob": promptBlob
             ])
         }
         return parts
-    }
-
-    private static func promptImageBlob(for asset: MediaAsset) throws -> String? {
-        switch asset.kind {
-        case .image:
-            guard let image = UIImage(contentsOfFile: asset.localCopyURL.path),
-                  let normalizedData = image.pngData() else {
-                return nil
-            }
-            return normalizedData.base64EncodedString()
-        case .movie:
-            guard let previewURL = try makeVideoPreviewImage(for: asset.localCopyURL),
-                  let image = UIImage(contentsOfFile: previewURL.path),
-                  let normalizedData = image.pngData() else {
-                return nil
-            }
-            return normalizedData.base64EncodedString()
-        }
-    }
-
-    private static func makeVideoPreviewImage(for sourceURL: URL) throws -> URL? {
-        let asset = AVURLAsset(url: sourceURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
-
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AileenPromptMedia", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let outputURL = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("jpg")
-
-        guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
-            return nil
-        }
-        let options = [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary
-        CGImageDestinationAddImage(destination, cgImage, options)
-        guard CGImageDestinationFinalize(destination) else {
-            return nil
-        }
-
-        return outputURL
     }
 
     static func sourceDimensionsDescription(for asset: MediaAsset) -> String {
@@ -565,7 +525,7 @@ enum ProductionToolSchema {
             localCopyURL: outputURL,
             displayName: outputURL.lastPathComponent
         )
-        guard let promptBlob = try promptImageBlob(for: renderedAsset) else {
+        guard let promptBlob = try PromptMediaEncoder.promptImageBlob(for: renderedAsset) else {
             return []
         }
 
@@ -634,8 +594,7 @@ enum ProductionToolSchema {
         """
     }
 
-    // TODO: do we need this?
-    private static func continuationTaskReminder(from originalPrompt: String) -> String {
+    static func continuationTaskReminder(from originalPrompt: String) -> String {
         let markers = [
             "briefing_editorial_digest:",
             "background_briefing (exact user-supplied briefing text):",
@@ -646,14 +605,20 @@ enum ProductionToolSchema {
             "story_intent_guidance:",
             "overlay_copy_policy:",
             "requested_output:",
-            "output_canvas:"
+            "output_canvas:",
+            "<story>",
+            "<background_briefing>",
+            "<output_canvas>",
+            "<available_media_assets>",
+            "<valid_source_asset_ids>"
         ]
 
         let terminators = [
             "available_media_assets:",
             "valid_source_asset_ids:",
             "If images or video previews are attached,",
-            "Additional experiment guidance:"
+            "Additional experiment guidance:",
+            "Additional production guidance:"
         ]
 
         var sections: [String] = []
@@ -679,6 +644,13 @@ enum ProductionToolSchema {
         }
 
         if let addendumRange = originalPrompt.range(of: "Additional experiment guidance:") {
+            let addendum = originalPrompt[addendumRange.lowerBound..<originalPrompt.endIndex]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !addendum.isEmpty {
+                sections.append(addendum)
+            }
+        }
+        if let addendumRange = originalPrompt.range(of: "Additional production guidance:") {
             let addendum = originalPrompt[addendumRange.lowerBound..<originalPrompt.endIndex]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !addendum.isEmpty {

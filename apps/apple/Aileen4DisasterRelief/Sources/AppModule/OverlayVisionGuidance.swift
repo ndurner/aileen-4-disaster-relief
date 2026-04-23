@@ -665,7 +665,7 @@ enum OverlayLayoutGuidance {
     }
 }
 
-private enum OverlayGuideToolSchema {
+enum OverlayGuideToolSchema {
     static let toolName = "submit_overlay_layout_guide"
 
     static let toolsJSON = """
@@ -721,17 +721,12 @@ private enum OverlayGuideToolSchema {
     """
 
     static func extract(fromRaw raw: String, fallbackText: String) -> OverlayLayoutGuide {
-        guard let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let toolCalls = object["tool_calls"] as? [[String: Any]],
-              let entry = toolCalls.first,
-              let function = entry["function"] as? [String: Any],
-              let name = function["name"] as? String,
-              name == toolName else {
+        let parsed = LiteRTResponseParser.parse(raw)
+        guard let toolCall = parsed.toolCalls.first(where: { $0.name == toolName }) else {
             return .empty
         }
 
-        let arguments = (function["arguments"] as? [String: Any] ?? [:]).compactMapValues(LiteRTToolValue.init(jsonValue:))
+        let arguments = toolCall.arguments
         let subjectRect = rect(
             x: arguments["subject_x"]?.numberValue,
             y: arguments["subject_y"]?.numberValue,
