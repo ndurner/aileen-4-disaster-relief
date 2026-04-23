@@ -258,14 +258,17 @@ enum OverlayAutomationLab {
         _ scenario: OverlayAutomationConfig.Scenario,
         outputDirectory: URL
     ) async -> OverlayAutomationResult.ScenarioResult {
+        if scenario.modelSource == "cloud" {
+            return await runCloudScenario(scenario, outputDirectory: outputDirectory)
+        }
+
         let sharedRunner = (scenario.reuseGemmaEngine ?? false) ? GemmaTextRunner() : nil
         let result: OverlayAutomationResult.ScenarioResult
         do {
             let outputKind = ProductionWorkflowViewModel.OutputKind(rawValue: scenario.outputKind) ?? .image
             let model = ModelOption(rawValue: scenario.model) ?? .e2bLiteRT
-            let modelSource = ModelSourcePreference(rawValue: scenario.modelSource) ?? .injected
             let locator = ModelLocator()
-            let modelAvailability = locator.resolve(model, sourcePreference: modelSource)
+            let modelAvailability = locator.resolve(model)
             guard let modelURL = modelAvailability.url else {
                 throw GemmaTextRunnerError.runtime(modelAvailability.detail)
             }
@@ -445,6 +448,90 @@ enum OverlayAutomationLab {
         return result
     }
 
+    private static func runCloudScenario(
+        _ scenario: OverlayAutomationConfig.Scenario,
+        outputDirectory: URL
+    ) async -> OverlayAutomationResult.ScenarioResult {
+        do {
+            let outputKind = ProductionWorkflowViewModel.OutputKind(rawValue: scenario.outputKind) ?? .image
+            let model = CloudModelOption(rawValue: scenario.model) ?? .gemma431B
+            let sourceAssets = try productionAssets(for: scenario.assetPaths)
+            let scenarioDirectory = outputDirectory.appendingPathComponent(sanitizedComponent(scenario.name), isDirectory: true)
+            try FileManager.default.createDirectory(at: scenarioDirectory, withIntermediateDirectories: true)
+
+            let apiKey = cloudAPIKey()
+            guard !apiKey.isEmpty else {
+                throw GoogleAIStudioClientError.missingAPIKey
+            }
+
+            let layoutGuideRun: OverlayAutomationLayoutGuideRun
+            if let layoutGuideOverridePath = scenario.layoutGuideOverridePath,
+               !layoutGuideOverridePath.isEmpty {
+                layoutGuideRun = try loadLayoutGuideOverride(from: layoutGuideOverridePath)
+            } else {
+                layoutGuideRun = OverlayAutomationLayoutGuideRun(
+                    guide: .empty,
+                    prompt: nil,
+                    rawResponses: [],
+                    thoughtTraces: []
+                )
+            }
+            try? writeLayoutGuideDiagnostics(layoutGuideRun, to: scenarioDirectory)
+
+            let protectedRegions = layoutGuideProtectedRegions(
+                from: layoutGuideRun.guide,
+                canvasSize: AppleMediaTooling.renderCanvasSize(for: outputKind),
+                enabled: scenario.useLayoutGuideProtectedRegions ?? false
+            )
+            let effectiveLayoutGuide: OverlayLayoutGuide
+            if scenario.useLayoutGuideProtectedRegions ?? false {
+                effectiveLayoutGuide = OverlayLayoutGuidance.makeGuide(
+                    provider: layoutGuideRun.guide.provider,
+                    protectedRegions: protectedRegions,
+                    canvasSize: AppleMediaTooling.renderCanvasSize(for: outputKind)
+                )
+            } else {
+                effectiveLayoutGuide = .empty
+            }
+
+            let prompt = makeCloudPrompt(
+                for: scenario,
+                outputKind: outputKind,
+                assets: sourceAssets,
+                supplementalAddendum: OverlayLayoutGuidance.promptAddendum(
+                    for: layoutGuideRun.guide,
+                    canvasSize: AppleMediaTooling.renderCanvasSize(for: outputKind),
+                    mode: OverlayLayoutGuidanceMode(rawValue: scenario.preOverlayGuidanceMode ?? "") ?? .slot
+                )
+            )
+            let attempt = try await runCloudAttempt(
+                index: 1,
+                prompt: prompt,
+                model: model,
+                apiKey: apiKey,
+                sourceAssets: sourceAssets,
+                outputKind: outputKind,
+                protectedRegions: protectedRegions,
+                layoutGuide: layoutGuideRun.guide,
+                layoutGuideOverride: effectiveLayoutGuide,
+                scenarioDirectory: scenarioDirectory,
+                disableEvaluationAnalysis: scenario.disableEvaluationAnalysis ?? true
+            )
+
+            return OverlayAutomationResult.ScenarioResult(
+                name: scenario.name,
+                attempts: [attempt],
+                error: nil
+            )
+        } catch {
+            return OverlayAutomationResult.ScenarioResult(
+                name: scenario.name,
+                attempts: [],
+                error: error.localizedDescription
+            )
+        }
+    }
+
     private static func runAttempt(
         index: Int,
         prompt: String,
@@ -537,6 +624,81 @@ enum OverlayAutomationLab {
             durationSeconds: Date().timeIntervalSince(start)
         )
         return (attempt, copiedFiles.last)
+    }
+
+    private static func runCloudAttempt(
+        index: Int,
+        prompt: String,
+        model: CloudModelOption,
+        apiKey: String,
+        sourceAssets: [ProductionAssetDescriptor],
+        outputKind: ProductionWorkflowViewModel.OutputKind,
+        protectedRegions: OverlayProtectedRegions,
+        layoutGuide: OverlayLayoutGuide,
+        layoutGuideOverride: OverlayLayoutGuide,
+        scenarioDirectory: URL,
+        disableEvaluationAnalysis: Bool
+    ) async throws -> OverlayAutomationResult.ScenarioResult.AttemptResult {
+        let start = Date()
+        let engine = GoogleAIStudioToolCallingEngine(apiKey: apiKey)
+        let toolResult = try await engine.run(
+            initialPrompt: prompt,
+            model: model,
+            sourceAssets: sourceAssets,
+            outputKind: outputKind,
+            systemInstruction: ProductionPrompts.productionSystemInstruction,
+            protectedRegionProvider: .none,
+            protectedRegionsOverride: protectedRegions,
+            layoutGuideOverride: layoutGuideOverride
+        )
+
+        let attemptDirectory = scenarioDirectory.appendingPathComponent("attempt-\(index)", isDirectory: true)
+        try FileManager.default.createDirectory(at: attemptDirectory, withIntermediateDirectories: true)
+        let copiedFiles = try copyOutputs(toolResult.producedURLs, to: attemptDirectory)
+        try prompt.write(to: attemptDirectory.appendingPathComponent("prompt.txt"), atomically: true, encoding: .utf8)
+        try toolResult.finalText.write(
+            to: attemptDirectory.appendingPathComponent("summary.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let rawResponsesData = try JSONSerialization.data(withJSONObject: toolResult.rawResponses, options: [.prettyPrinted])
+        try rawResponsesData.write(to: attemptDirectory.appendingPathComponent("raw-responses.json"))
+        if !toolResult.thoughtTraces.isEmpty {
+            let thoughtText = toolResult.thoughtTraces.joined(separator: "\n\n---\n\n")
+            try thoughtText.write(
+                to: attemptDirectory.appendingPathComponent("thought-traces.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        return OverlayAutomationResult.ScenarioResult.AttemptResult(
+            attemptIndex: index,
+            prompt: prompt,
+            toolCalls: toolResult.toolCalls.map(toolCallRecord),
+            toolResponsePayloads: toolResult.toolResponsePayloads,
+            producedFiles: copiedFiles.map(\.path),
+            rawResponses: toolResult.rawResponses,
+            thoughtTraces: toolResult.thoughtTraces,
+            summary: toolResult.finalText,
+            firstOverlayStyle: firstOverlayStyle(from: toolResult.toolCalls, toolResponsePayloads: toolResult.toolResponsePayloads),
+            firstOverlayTopFraction: firstOverlayTopFraction(
+                from: toolResult.toolCalls,
+                toolResponsePayloads: toolResult.toolResponsePayloads,
+                outputKind: outputKind
+            ),
+            goodness: goodness(
+                from: toolResult.toolCalls,
+                toolResponsePayloads: toolResult.toolResponsePayloads,
+                outputKind: outputKind,
+                enableThinking: false,
+                layoutGuide: layoutGuide,
+                evaluationGuide: disableEvaluationAnalysis ? .empty : layoutGuide,
+                review: nil
+            ),
+            review: nil,
+            durationSeconds: Date().timeIntervalSince(start)
+        )
     }
 
     private static func runRawThinkingDiagnosticAttempt(
@@ -968,6 +1130,37 @@ enum OverlayAutomationLab {
 
         guard !addenda.isEmpty else { return basePrompt }
         return "\(basePrompt)\n\nAdditional experiment guidance:\n\(addenda.joined(separator: "\n\n"))"
+    }
+
+    private static func makeCloudPrompt(
+        for scenario: OverlayAutomationConfig.Scenario,
+        outputKind: ProductionWorkflowViewModel.OutputKind,
+        assets: [ProductionAssetDescriptor],
+        supplementalAddendum: String?
+    ) -> String {
+        let basePrompt = ProductionPrompts.productionPrompt(
+            backgroundBriefing: scenario.backgroundBriefing,
+            story: scenario.story,
+            outputKind: outputKind,
+            assets: assets,
+            canvasSize: AppleMediaTooling.renderCanvasSize(for: outputKind)
+        )
+        let addenda: [String] = [
+            scenario.promptAddendum?.trimmingCharacters(in: .whitespacesAndNewlines),
+            supplementalAddendum?.trimmingCharacters(in: .whitespacesAndNewlines)
+        ].compactMap { value in
+            guard let value, !value.isEmpty else { return nil }
+            return value
+        }
+
+        guard !addenda.isEmpty else { return basePrompt }
+        return "\(basePrompt)\n\nAdditional production guidance:\n\(addenda.joined(separator: "\n\n"))"
+    }
+
+    private static func cloudAPIKey() -> String {
+        let environment = ProcessInfo.processInfo.environment
+        return (environment["GEMINI_API_KEY"] ?? environment["GOOGLE_AI_STUDIO_API_KEY"] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func copyOutputs(_ urls: [URL], to directory: URL) throws -> [URL] {
