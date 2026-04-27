@@ -31,7 +31,6 @@ final class ProductionWorkflowViewModel: ObservableObject {
     @Published var assets: [MediaAsset] = []
     @Published var outputKind: OutputKind = .image
     @Published var isRunning = false
-    @Published var productionSummary = ""
     @Published var postBodyText = ""
     @Published var producedURLs: [URL] = []
     @Published var shareItems: [Any] = []
@@ -91,7 +90,6 @@ final class ProductionWorkflowViewModel: ObservableObject {
     func run(backgroundBriefing: String, story: String, inference: InferenceConfiguration) async {
         isRunning = true
         latestError = nil
-        productionSummary = ""
         postBodyText = ""
         producedURLs = []
         shareItems = []
@@ -239,7 +237,6 @@ final class ProductionWorkflowViewModel: ObservableObject {
             throw GemmaTextRunnerError.runtime("Gemma did not produce a finished visual with the required overlay.")
         }
 
-        productionSummary = productionSummary(for: toolResult)
         producedURLs = toolResult.producedURLs
         shareItems = producedURLs
 
@@ -257,8 +254,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
         do {
             let postBodyPrompt = ProductionPrompts.postBodyPrompt(
                 backgroundBriefing: backgroundBriefing,
-                story: story,
-                producedVisualSummary: productionSummary
+                story: story
             )
             let parsed = try await postBodyRunner.sendJSON(
                 ProductionToolSchema.userMessageJSON(text: postBodyPrompt, assets: productionAssets)
@@ -314,14 +310,12 @@ final class ProductionWorkflowViewModel: ObservableObject {
             throw GemmaTextRunnerError.runtime("Gemma did not produce a finished visual with the required overlay.")
         }
 
-        productionSummary = productionSummary(for: toolResult)
         producedURLs = toolResult.producedURLs
         shareItems = producedURLs
 
         let postBodyPrompt = ProductionPrompts.postBodyPrompt(
             backgroundBriefing: backgroundBriefing,
-            story: story,
-            producedVisualSummary: productionSummary
+            story: story
         )
         let client = GoogleAIStudioClient(apiKey: inference.cloudAPIKey)
         let response: GoogleAIStudioGenerateContentResponse
@@ -480,36 +474,6 @@ final class ProductionWorkflowViewModel: ObservableObject {
             Self.logger.error("Google AI Studio overlay pre-analysis failed; continuing without guidance: \(error.localizedDescription, privacy: .public)")
             return .empty
         }
-    }
-
-    private func productionSummary(for toolResult: ToolExecutionResult) -> String {
-        guard !toolResult.producedURLs.isEmpty else {
-            return "No visual was produced."
-        }
-
-        let visibleText = userVisibleFinalText(from: toolResult.finalText)
-        if !visibleText.isEmpty {
-            return visibleText
-        }
-
-        let overlayActions = toolResult.toolCalls.filter {
-            $0.name == "add_text_overlay" || $0.name == "move_text_overlay"
-        }
-
-        if overlayActions.isEmpty {
-            return "Produced a publication-ready \(outputKind.rawValue) without a text overlay."
-        }
-
-        return "Produced a publication-ready \(outputKind.rawValue) with a single text overlay."
-    }
-
-    private func userVisibleFinalText(from text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.hasPrefix("Stopped after duplicate overlay calls"),
-              !trimmed.contains("tool rounds to avoid a non-progressing overlay loop") else {
-            return ""
-        }
-        return trimmed
     }
 
     private func cloudStageError(_ stage: String, underlying error: Error) -> GemmaTextRunnerError {
@@ -679,7 +643,7 @@ enum ProductionPrompts {
 
         Source hierarchy:
         - Treat story as the primary narrative source.
-        - Treat visual_output_summary as the primary visual grounding.
+        - Treat the attached media as visual grounding.
         - Treat background_briefing as secondary channel context only. It may refine audience fit, naming, or tone constraints, but it must not supply the main claim, emotional posture, or campaign line unless the story clearly supports it.
 
         Caption policy:
@@ -690,7 +654,7 @@ enum ProductionPrompts {
         - Avoid lines such as "we are pleased to share", "we are proud to share", "we are relieved to share", "our team is working hard", or similar institutional affect.
         - Avoid generic crisis or nonprofit boilerplate such as "amidst the aftermath", "during these challenging times", "safe and protected", "mission in action", "rescue effort", or similar broad framing unless the story itself explicitly centers that framing.
         - Avoid self-congratulatory, inspirational, or fundraising-adjacent tone unless clearly requested by the inputs.
-        - Do not add event names, place names, campaign names, or organization names unless they are present in the story, clearly supported by the visual_output_summary, or genuinely necessary.
+        - Do not add event names, place names, campaign names, or organization names unless they are present in the story, clearly supported by the attached media, or genuinely necessary.
         - Prefer language that feels natural, specific, and lightly alive.
         - Avoid both polished institutional phrasing and flat case-report phrasing.
         - A good default is a concise caption with a little rhythm, scene, or human immediacy.
@@ -753,7 +717,7 @@ enum ProductionPrompts {
         """
     }
 
-    static func postBodyPrompt(backgroundBriefing: String, story: String, producedVisualSummary: String) -> String {
+    static func postBodyPrompt(backgroundBriefing: String, story: String) -> String {
         """
         Write a concise Instagram caption from these labeled user fields.
 
@@ -761,16 +725,12 @@ enum ProductionPrompts {
         \(story)
         </story>
 
-        <visual_output_summary>
-        \(producedVisualSummary.isEmpty ? "(none produced)" : producedVisualSummary)
-        </visual_output_summary>
-
         <background_briefing>
         \(backgroundBriefing)
         </background_briefing>
 
         Use the story as the main caption angle.
-        Use the visual summary for one concrete scene detail, setting cue, or mood detail.
+        Use the attached media for one concrete scene detail, setting cue, or mood detail.
         Use the background briefing only as supporting context.
 
         Keep the wording close to the story.

@@ -156,17 +156,6 @@ struct ContentProductionView: View {
                 .disabled(viewModel.isRunning || cloudModeNeedsAPIKey)
             }
 
-            if !viewModel.productionSummary.isEmpty {
-                OceanCard {
-                    OceanSectionHeader(title: "Visual production summary")
-
-                    Text(viewModel.productionSummary)
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundStyle(OceanPalette.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
             if !viewModel.postBodyText.isEmpty {
                 OceanCard {
                     OceanSectionHeader(title: "Post body")
