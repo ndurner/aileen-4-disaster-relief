@@ -44,10 +44,13 @@ actor GoogleAIStudioToolCallingEngine {
         var rawResponses: [String] = []
         var thoughtTraces: [String] = []
 
-        let composePrompt = composeTurnPrompt(from: initialPrompt)
-        Self.logOutgoingTurn(label: "visual user turn 1", text: composePrompt, assets: [])
+        let needsComposition = sourceAssets.count > 1
+        let firstPrompt = needsComposition ? composeTurnPrompt(from: initialPrompt) : initialPrompt
+        let firstAssets = needsComposition ? [] : sourceAssets
+        let firstAllowedFunctions = needsComposition ? ["compose_visuals"] : ["add_text_overlay"]
+        Self.logOutgoingTurn(label: "visual user turn 1", text: firstPrompt, assets: firstAssets)
         var contents: [[String: Any]] = [
-            try GoogleAIStudioMessageFactory.userMessage(text: composePrompt)
+            try GoogleAIStudioMessageFactory.userMessage(text: firstPrompt, assets: firstAssets)
         ]
 
         var response = try await client.sendGenerateContent(
@@ -55,7 +58,7 @@ actor GoogleAIStudioToolCallingEngine {
             contents: GoogleAIStudioContents(value: contents),
             systemInstruction: Self.toolSelectionSystemInstruction,
             toolsJSON: ProductionToolSchema.toolsJSON,
-            toolConfig: .constrainedToAllowedFunctions(["compose_visuals"])
+            toolConfig: .constrainedToAllowedFunctions(firstAllowedFunctions)
         )
         var parsed = response.parsedMessage
         Self.logIncomingTurn(label: "visual model turn 1", response: response)
@@ -87,6 +90,9 @@ actor GoogleAIStudioToolCallingEngine {
 
             responsePayloads.append(contentsOf: responses.map { ProductionToolSchema.stringify($0.payload) })
             latestProducedURL = responses.compactMap(\.outputURL).last ?? latestProducedURL
+            if responses.contains(where: { $0.name == "accept_overlay_layout" }) {
+                break
+            }
 
             let responseStatuses = responses.compactMap { $0.payload["status"] as? String }
             if !responseStatuses.isEmpty && responseStatuses.allSatisfy({ $0 == "skipped_duplicate" }) {
@@ -98,30 +104,14 @@ actor GoogleAIStudioToolCallingEngine {
                 break
             }
 
-            let responseNames = responses.map(\.name)
             guard let allowedFunctionNames = allowedFunctionNames(after: responses) else {
                 break
             }
 
-            let renderedAssets = renderedAssets(from: responses)
-            let nextPrompt = nextTurnPrompt(
-                initialPrompt: initialPrompt,
-                responses: responses,
-                renderedAssets: renderedAssets
-            )
-            Self.logOutgoingTurn(
-                label: "visual user turn \(toolRounds + 1)",
-                text: nextPrompt,
-                assets: renderedAssets
-            )
             contents.append(response.modelContentObject.value)
             contents.append(GoogleAIStudioMessageFactory.functionResponseMessage(
                 toolCalls: parsed.toolCalls,
                 responses: responses
-            ))
-            contents.append(try GoogleAIStudioMessageFactory.userMessage(
-                text: nextPrompt,
-                assets: renderedAssets
             ))
 
             response = try await client.sendGenerateContent(
@@ -169,50 +159,6 @@ actor GoogleAIStudioToolCallingEngine {
         """
     }
 
-    private func nextTurnPrompt(
-        initialPrompt: String,
-        responses: [MediaToolResult],
-        renderedAssets: [ProductionAssetDescriptor]
-    ) -> String {
-        if let latestRendered = renderedAssets.last {
-            return ProductionToolSchema.continuationPrompt(
-                originalPrompt: initialPrompt,
-                responses: responses,
-                renderedAssetID: latestRendered.toolID
-            )
-        }
-
-        let responseSummary = responses.map { result in
-            "- \(result.name): \(ProductionToolSchema.stringify(result.payload))"
-        }.joined(separator: "\n")
-
-        return """
-        Continue the same content-production task.
-
-        Latest tool results:
-        \(responseSummary)
-        """
-    }
-
-    private func renderedAssets(from responses: [MediaToolResult]) -> [ProductionAssetDescriptor] {
-        responses.compactMap { result -> ProductionAssetDescriptor? in
-            guard let renderedURL = result.outputURL,
-                  let renderedAssetID = result.payload["asset_id"] as? String else {
-                return nil
-            }
-
-            return ProductionAssetDescriptor(
-                toolID: renderedAssetID,
-                mediaAsset: MediaAsset(
-                    kind: MediaAsset.kind(for: renderedURL),
-                    originalURL: renderedURL,
-                    localCopyURL: renderedURL,
-                    displayName: renderedURL.lastPathComponent
-                )
-            )
-        }
-    }
-
     private func allowedFunctionNames(after responses: [MediaToolResult]) -> [String]? {
         let names = responses.map(\.name)
         if names.contains("accept_overlay_layout") {
@@ -222,7 +168,7 @@ actor GoogleAIStudioToolCallingEngine {
             return ["add_text_overlay"]
         }
         if names.contains("add_text_overlay") || names.contains("move_text_overlay") {
-            return ["move_text_overlay", "accept_overlay_layout"]
+            return ["accept_overlay_layout"]
         }
         return nil
     }

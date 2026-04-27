@@ -5,6 +5,8 @@ import UIKit
 import UniformTypeIdentifiers
 
 enum PromptMediaEncoder {
+    private static let directlySupportedImageExtensions: Set<String> = ["jpg", "jpeg", "png"]
+
     static func promptImageBlob(for asset: MediaAsset) throws -> String? {
         guard let data = try promptImagePNGData(for: asset) else {
             return nil
@@ -17,6 +19,19 @@ enum PromptMediaEncoder {
             return nil
         }
         return "data:image/png;base64,\(blob)"
+    }
+
+    static func promptImageFileURL(for asset: MediaAsset) throws -> URL? {
+        switch asset.kind {
+        case .image:
+            let ext = asset.localCopyURL.pathExtension.lowercased()
+            if directlySupportedImageExtensions.contains(ext) {
+                return asset.localCopyURL
+            }
+            return try makeNormalizedPromptPNG(for: asset.localCopyURL)
+        case .movie:
+            return try makeVideoPreviewImage(for: asset.localCopyURL)
+        }
     }
 
     private static func promptImagePNGData(for asset: MediaAsset) throws -> Data? {
@@ -56,6 +71,19 @@ enum PromptMediaEncoder {
             return nil
         }
 
+        return outputURL
+    }
+
+    private static func makeNormalizedPromptPNG(for sourceURL: URL) throws -> URL? {
+        guard let image = UIImage(contentsOfFile: sourceURL.path),
+              let normalizedData = image.pngData() else {
+            return nil
+        }
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AileenPromptMedia", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let outputURL = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("png")
+        try normalizedData.write(to: outputURL, options: .atomic)
         return outputURL
     }
 }

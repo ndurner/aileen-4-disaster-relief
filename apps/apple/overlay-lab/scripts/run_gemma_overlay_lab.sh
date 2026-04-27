@@ -129,12 +129,12 @@ from pathlib import Path
 config_path = Path(sys.argv[1])
 inputs = [Path(p) for p in sys.argv[2:]]
 
-background = (
+background = os.environ.get("AILEEN_GEMMA_BACKGROUND") or (
     "Create an Instagram-style wildlife or conservation visual. "
     "The tone should feel current to recent Instagram story aesthetics, "
     "not like a news chyron or a fixed top banner."
 )
-story = (
+story = os.environ.get("AILEEN_GEMMA_STORY") or (
     "Use the image itself as the factual grounding. "
     "If an overlay helps, keep it very short, concrete, and visually native to the frame."
 )
@@ -183,7 +183,7 @@ scenario_templates = [
         "suffix": "normalized-measured",
         "promptAddendum": (
             "Use at most one overlay. Prefer the normalized overlay hints instead of raw width and height guesses. "
-            "Choose style from composition. For a subject-dominant frame, prefer sticker with top_fraction between 0.20 and 0.32, max_width_fraction between 0.42 and 0.68, target_line_count 2, and horizontal_anchor center. "
+            "Choose style from the source frame. For a subject-dominant frame, prefer sticker with top_fraction between 0.20 and 0.32, max_width_fraction between 0.42 and 0.68, target_line_count 2, and horizontal_anchor center. "
             "For a clean negative-space frame, prefer caption with top_fraction between 0.46 and 0.58, max_width_fraction between 0.40 and 0.72, and target_line_count 1 or 2. "
             "Use headline only when the text can stay on one line and remain highly legible without a box. "
             "Leave raw x, y, width, and height unset unless you need a deliberate slot override."
@@ -206,7 +206,7 @@ scenario_templates = [
     {
         "suffix": "slot-anchored",
         "promptAddendum": (
-            "Use at most one overlay. After compose_visuals, inspect the rendered preview and identify one clean free slot where text can live without covering the main subject. "
+            "Use at most one overlay. Inspect the source frame and identify one clean free slot where text can live without covering the main subject. "
             "Describe that free slot with x, y, width, and height in the rendered canvas, then place the overlay inside it using horizontal_anchor center and vertical_anchor bottom. "
             "Use target_line_count so the renderer measures the final width from the text. "
             "Prefer sticker for busy subject-dominant frames and caption only for genuine negative space. "

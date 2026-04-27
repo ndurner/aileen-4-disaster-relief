@@ -163,11 +163,14 @@ final class AppleMediaTooling: @unchecked Sendable {
     }
 
     private func addTextOverlay(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
-        guard let assetID = arguments["asset_id"]?.stringValue else {
+        guard let assetID = toolAssetID(from: arguments) else {
             throw MediaToolingError.invalidArguments("add_text_overlay requires asset_id and overlay_text.")
         }
 
-        let asset = try resolveAsset(assetID)
+        var asset = try resolveAsset(assetID)
+        if asset.baseAssetID == nil && asset.latestOverlayRequest == nil {
+            asset = try await materializeSourceAssetForOverlay(asset)
+        }
         if asset.latestOverlayRequest != nil {
             return try await moveTextOverlay(arguments: arguments)
         }
@@ -233,7 +236,7 @@ final class AppleMediaTooling: @unchecked Sendable {
     }
 
     private func moveTextOverlay(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
-        guard let assetID = arguments["asset_id"]?.stringValue else {
+        guard let assetID = toolAssetID(from: arguments) else {
             throw MediaToolingError.invalidArguments("move_text_overlay requires asset_id.")
         }
 
@@ -305,7 +308,7 @@ final class AppleMediaTooling: @unchecked Sendable {
     }
 
     private func acceptOverlayLayout(arguments: [String: LiteRTToolValue]) throws -> MediaToolResult {
-        guard let assetID = arguments["asset_id"]?.stringValue else {
+        guard let assetID = toolAssetID(from: arguments) else {
             throw MediaToolingError.invalidArguments("accept_overlay_layout requires asset_id.")
         }
         let asset = try resolveAsset(assetID)
@@ -318,6 +321,30 @@ final class AppleMediaTooling: @unchecked Sendable {
             ],
             outputURL: nil
         )
+    }
+
+    private func materializeSourceAssetForOverlay(_ asset: RenderedAsset) async throws -> RenderedAsset {
+        switch outputKind {
+        case .image:
+            let imageFileType = asset.preferredImageFileType ?? .jpeg
+            let outputURL = try renderImageMontage(from: [asset], canvasSize: renderCanvasSize, fileType: imageFileType)
+            return registerRenderedAsset(
+                url: outputURL,
+                kind: .image,
+                canvasSize: renderCanvasSize,
+                preferredImageFileType: imageFileType,
+                baseAssetID: asset.toolID
+            )
+        case .reel:
+            let outputURL = try await renderReel(from: [asset], canvasSize: renderCanvasSize)
+            return registerRenderedAsset(
+                url: outputURL,
+                kind: .movie,
+                canvasSize: renderCanvasSize,
+                preferredImageFileType: nil,
+                baseAssetID: asset.toolID
+            )
+        }
     }
 
     private func resolvedOverlayRequest(
@@ -339,31 +366,41 @@ final class AppleMediaTooling: @unchecked Sendable {
         return asset
     }
 
+    private func toolAssetID(from arguments: [String: LiteRTToolValue], key: String = "asset_id") -> String? {
+        guard let raw = arguments[key]?.stringValue else {
+            return nil
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        return normalizedAssetID(from: trimmed) ?? trimmed
+    }
+
+    private func normalizedAssetID(from raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        if assets[trimmed] != nil {
+            return trimmed
+        }
+
+        let pattern = #"(?:asset|rendered)_\d+"#
+        guard let range = trimmed.range(of: pattern, options: .regularExpression) else {
+            return nil
+        }
+
+        let candidate = String(trimmed[range])
+        return assets[candidate] == nil ? nil : candidate
+    }
+
     private func composeAssetIDs(from arguments: [String: LiteRTToolValue]) -> [String]? {
-        if let assetIDs = arguments["asset_ids"]?.stringArrayValue?.filter({ !$0.isEmpty }),
+        if let assetIDs = arguments["asset_ids"]?.stringArrayValue?
+            .map({ normalizedAssetID(from: $0) ?? $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            .filter({ !$0.isEmpty }),
            !assetIDs.isEmpty {
             return assetIDs
-        }
-
-        if let assetID = arguments["asset_id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !assetID.isEmpty {
-            return [assetID]
-        }
-
-        if let raw = arguments["asset_ids"]?.stringValue {
-            let normalized = raw
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-            let parts = normalized
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if !parts.isEmpty {
-                return parts
-            }
-            if !normalized.isEmpty {
-                return [normalized]
-            }
         }
 
         let sourceAssetIDs = assets.values

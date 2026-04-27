@@ -649,15 +649,16 @@ enum ProductionPrompts {
 
         Tool workflow:
         - Use only exact asset IDs that appear in the user message.
-        - Call compose_visuals first.
-        - Then call add_text_overlay exactly once on the rendered asset returned by composition.
+        - For a single source asset, call add_text_overlay directly on that source asset ID. The app will render the source onto the output canvas before drawing text.
+        - Use compose_visuals only when multiple source assets must be combined before adding the overlay.
+        - Call add_text_overlay exactly once.
         - After an overlay exists on the current rendered frame, never call add_text_overlay again in that run.
         - If the overlay needs improvement, use move_text_overlay rather than stacking another main overlay or omitting text.
         - Once an overlay exists, the only valid next tool calls are move_text_overlay or accept_overlay_layout.
         - Prefer a correct tool call over a plain-text answer whenever tool use is possible.
 
         Placement policy:
-        - Base placement on the rendered frame after composition, not only on raw source media.
+        - Base placement on the source or rendered frame supplied in the current turn.
         - Prefer one compact sticker-style overlay in available free space.
         - Avoid placing text on or tight against the main subject's face, body, or primary silhouette.
         - Keep the composition readable and visually balanced.
@@ -741,9 +742,12 @@ enum ProductionPrompts {
         \(validSourceIDs.isEmpty ? "(none selected)" : validSourceIDs)
         </valid_source_asset_ids>
 
-        Output rules:
-        - Return only the overlay copy.
-        - One line only.
+        Tool-call rules:
+        - When tool use is available, do not return the overlay copy as plain text.
+        - For a single source asset, call add_text_overlay directly on that asset_id with one compact overlay_text.
+        - asset_id must be exactly one listed or returned ID such as asset_1 or rendered_2; never include overlay_text or punctuation in asset_id.
+        - After add_text_overlay succeeds, call accept_overlay_layout on the returned rendered asset_id unless the layout clearly needs a move_text_overlay correction.
+        - Keep overlay_text to one short line.
         - No hashtags unless clearly supported by the story.
         - No emojis unless clearly supported by the story.
         """

@@ -131,18 +131,11 @@ actor GemmaToolCallingEngine {
                     """.trimmingCharacters(in: .whitespacesAndNewlines)
                     break
                 }
-                if let continuation = try await makeFreshContinuationMessage(
-                    initialPrompt: initialPrompt,
-                    responses: responses,
-                    modelURL: modelURL,
-                    systemMessageJSON: systemMessageJSON,
-                    extraContextJSON: extraContextJSON
-                ) {
-                    parsed = try await runner.sendJSON(continuation)
-                } else {
-                    let responseMessage = try ProductionToolSchema.toolResponseJSON(for: responses)
-                    parsed = try await runner.sendJSON(responseMessage)
+                if responses.contains(where: { $0.name == "accept_overlay_layout" }) {
+                    break
                 }
+                let responseMessage = try ProductionToolSchema.toolResponseJSON(for: responses)
+                parsed = try await runner.sendJSON(responseMessage)
                 finalText = parsed.text
                 rawResponses.append(parsed.rawJSON)
                 if !parsed.thoughtText.isEmpty {
@@ -245,8 +238,12 @@ actor GemmaToolCallingEngine {
             }
             responsePayloads.append(contentsOf: responses.map { ProductionToolSchema.stringify($0.payload) })
             latestProducedURL = responses.compactMap(\.outputURL).last ?? latestProducedURL
-            let responseMessage = try ProductionToolSchema.toolResponseJSON(for: responses)
-            parsed = try await runner.sendJSON(responseMessage)
+            if let continuation = try makeReviewContinuationMessage(responses: responses) {
+                parsed = try await runner.sendJSON(continuation)
+            } else {
+                let responseMessage = try ProductionToolSchema.toolResponseJSON(for: responses)
+                parsed = try await runner.sendJSON(responseMessage)
+            }
             finalText = parsed.text
             rawResponses.append(parsed.rawJSON)
             if !parsed.thoughtText.isEmpty {
@@ -257,25 +254,14 @@ actor GemmaToolCallingEngine {
         return (seenCalls, responsePayloads, latestProducedURL, finalText, rawResponses, thoughtTraces)
     }
 
-    private func makeFreshContinuationMessage(
-        initialPrompt: String,
-        responses: [MediaToolResult],
-        modelURL: URL,
-        systemMessageJSON: String,
-        extraContextJSON: String?
-    ) async throws -> String? {
+    private func makeReviewContinuationMessage(
+        responses: [MediaToolResult]
+    ) throws -> String? {
         guard let latestRendered = responses.last(where: { $0.outputURL != nil }),
               let renderedURL = latestRendered.outputURL,
               let renderedAssetID = latestRendered.payload["asset_id"] as? String else {
             return nil
         }
-
-        try await runner.makeToolSession(
-            modelURL: modelURL,
-            toolsJSON: ProductionToolSchema.toolsJSON,
-            systemMessageJSON: systemMessageJSON,
-            extraContextJSON: extraContextJSON
-        )
 
         let renderedAsset = ProductionAssetDescriptor(
             toolID: renderedAssetID,
@@ -287,13 +273,17 @@ actor GemmaToolCallingEngine {
             )
         )
 
-        let continuationPrompt = ProductionToolSchema.continuationPrompt(
-            originalPrompt: initialPrompt,
-            responses: responses,
-            renderedAssetID: renderedAssetID
-        )
-        return try ProductionToolSchema.userMessageJSON(
-            text: continuationPrompt,
+        let prompt = """
+        Continue the same rendered-overlay review from this updated frame.
+        The attached image is the current rendered state for asset_id \(renderedAssetID).
+        Judge the actual pixels in this attached image.
+        If the current label is now publishable, stop without another tool call or use accept_overlay_layout if available.
+        If the label still clearly needs a material placement or style improvement, call move_text_overlay on asset_id \(renderedAssetID).
+        """
+
+        return try ProductionToolSchema.toolResponseAndUserMessageJSON(
+            for: responses,
+            text: prompt,
             assets: [renderedAsset]
         )
     }
@@ -346,7 +336,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "compose_visuals",
-          "description": "Create the base visual from one or more exact source asset IDs such as asset_1. Use only the listed asset IDs, never file paths, filenames, or UUIDs. The app determines whether the result is a still image or a reel from its current output mode.",
+          "description": "Create a base visual from multiple exact source asset IDs when assets must be combined before overlaying. Do not use this as a routine first step for a single source asset; add_text_overlay can render the source asset onto the output canvas itself. Use only listed asset IDs, never file paths, filenames, or UUIDs.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -360,7 +350,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "add_text_overlay",
-          "description": "Draw a publication-ready text overlay on an existing rendered asset such as rendered_1. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not near the subject's face, body, or main silhouette. Prefer empty sky, water, pavement, wall area, or a clean frame edge over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. If you use normalized placement, do not also guess raw x, y, width, or height. If you provide x, y, width, and height together with anchors, the renderer treats that rectangle as an available slot in the rendered frame rather than as the exact final text box. The final size can vary because the renderer measures wrapped text. Use only exact returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
+          "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not near the subject's face, body, or main silhouette. Prefer empty sky, water, pavement, wall area, or a clean frame edge over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. If you use normalized placement, do not also guess raw x, y, width, or height. If you provide x, y, width, and height together with anchors, the renderer treats that rectangle as an available slot in the rendered frame rather than as the exact final text box. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -394,7 +384,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "move_text_overlay",
-          "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. Use this when the current overlay is close but needs a material placement or style change. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from the subject rather than closer to it. Prefer free space and frame edges over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. In normalized mode, do not also guess raw x, y, width, or height. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
+          "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay is close but needs a material placement or style change. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from the subject rather than closer to it. Prefer free space and frame edges over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. In normalized mode, do not also guess raw x, y, width, or height. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -428,7 +418,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "accept_overlay_layout",
-          "description": "Explicitly mark the current rendered asset as visually acceptable with no further overlay movement needed.",
+          "description": "Explicitly mark the current rendered asset as visually acceptable with no further overlay movement needed. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas or other arguments inside asset_id.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -442,14 +432,17 @@ enum ProductionToolSchema {
     """
 
     static func userMessageJSON(text: String, assets: [ProductionAssetDescriptor] = []) throws -> String {
+        stringify(try userMessageObject(text: text, assets: assets))
+    }
+
+    private static func userMessageObject(text: String, assets: [ProductionAssetDescriptor] = []) throws -> [String: Any] {
         var content = try mediaParts(for: assets)
         content.append(["type": "text", "text": text])
 
-        let message: [String: Any] = [
+        return [
             "role": "user",
             "content": content
         ]
-        return stringify(message)
     }
 
     static func systemTextJSON(_ text: String) -> String {
@@ -462,19 +455,33 @@ enum ProductionToolSchema {
     }
 
     static func toolResponseJSON(for results: [MediaToolResult]) throws -> String {
+        stringify(toolResponseMessageObject(for: results))
+    }
+
+    static func toolResponseAndUserMessageJSON(
+        for results: [MediaToolResult],
+        text: String,
+        assets: [ProductionAssetDescriptor]
+    ) throws -> String {
+        stringify([
+            toolResponseMessageObject(for: results),
+            try userMessageObject(text: text, assets: assets)
+        ])
+    }
+
+    private static func toolResponseMessageObject(for results: [MediaToolResult]) -> [String: Any] {
         var content: [[String: Any]] = []
         for result in results {
             content.append([
                 "type": "tool_response",
-                "tool_name": result.name,
-                "content": stringify(result.payload)
+                "name": result.name,
+                "response": result.payload
             ])
-            content.append(contentsOf: try renderedMediaParts(for: result))
         }
-        return stringify([
-            "role": "user",
+        return [
+            "role": "tool",
             "content": content
-        ])
+        ]
     }
 
     static func stringify(_ object: Any) -> String {
@@ -487,10 +494,10 @@ enum ProductionToolSchema {
 
         var parts: [[String: Any]] = []
         for asset in assets {
-            guard let promptBlob = try PromptMediaEncoder.promptImageBlob(for: asset.mediaAsset) else { continue }
+            guard let promptURL = try PromptMediaEncoder.promptImageFileURL(for: asset.mediaAsset) else { continue }
             parts.append([
                 "type": "image",
-                "blob": promptBlob
+                "path": promptURL.path
             ])
         }
         return parts
@@ -516,156 +523,6 @@ enum ProductionToolSchema {
         }
     }
 
-    private static func renderedMediaParts(for result: MediaToolResult) throws -> [[String: Any]] {
-        guard let outputURL = result.outputURL else { return [] }
-
-        let renderedAsset = MediaAsset(
-            kind: MediaAsset.kind(for: outputURL),
-            originalURL: outputURL,
-            localCopyURL: outputURL,
-            displayName: outputURL.lastPathComponent
-        )
-        guard let promptBlob = try PromptMediaEncoder.promptImageBlob(for: renderedAsset) else {
-            return []
-        }
-
-        let assetID = result.payload["asset_id"] as? String ?? "rendered asset"
-        let canvasWidth = result.payload["canvas_width"] as? Int
-        let canvasHeight = result.payload["canvas_height"] as? Int
-        let canvasDescription: String
-        if let canvasWidth, let canvasHeight {
-            canvasDescription = "\(canvasWidth)x\(canvasHeight) px canvas"
-        } else {
-            canvasDescription = sourceDimensionsDescription(for: renderedAsset)
-        }
-
-        return [
-            [
-                "type": "image",
-                "blob": promptBlob
-            ],
-            [
-                "type": "text",
-                "text": "\nRendered result for \(assetID) (\(canvasDescription)). Base any follow-up overlay placement on this rendered frame, not only on the original source image."
-            ]
-        ]
-    }
-
-    static func continuationPrompt(
-        originalPrompt: String,
-        responses: [MediaToolResult],
-        renderedAssetID: String
-    ) -> String {
-        let latestToolNames = responses.map(\.name)
-        let responseSummary = responses.map { result in
-            "- \(result.name): \(stringify(result.payload))"
-        }.joined(separator: "\n")
-        let nextStepInstruction: String
-        if latestToolNames.contains("add_text_overlay") || latestToolNames.contains("move_text_overlay") {
-            nextStepInstruction = """
-            The attached frame already includes the latest overlay state.
-            If the overlay still needs work, call move_text_overlay on asset_id \(renderedAssetID).
-            Do not call add_text_overlay again unless you are intentionally starting a brand-new overlay from a clean frame.
-            If the current rendered frame is already publishable, stop without another tool call or use accept_overlay_layout.
-            """
-        } else {
-            nextStepInstruction = """
-            The attached frame is a composed base render with no accepted overlay yet.
-            This workflow requires one overlay, so call add_text_overlay on asset_id \(renderedAssetID) and include an explicit overlay_text string.
-            Do not call add_text_overlay without overlay_text.
-            Use move_text_overlay only after an overlay already exists on the current rendered frame.
-            Do not stop while the current rendered frame still has no overlay.
-            """
-        }
-
-        return """
-        Continue the same content-production task from the latest rendered frame only.
-
-        Task reminder:
-        \(continuationTaskReminder(from: originalPrompt))
-
-        Latest tool results:
-        \(responseSummary)
-
-        The attached image is the current rendered state for asset_id \(renderedAssetID).
-        Base the next decision on this attached rendered frame.
-        Do not repeat compose_visuals unless the composition itself is materially wrong.
-        \(nextStepInstruction)
-        """
-    }
-
-    static func continuationTaskReminder(from originalPrompt: String) -> String {
-        let markers = [
-            "briefing_editorial_digest:",
-            "background_briefing (exact user-supplied briefing text):",
-            "brand_voice_digest:",
-            "story (factual seed text; may be sparse or a test):",
-            "story (exact user-supplied story text; may be sparse or a test):",
-            "story_mode:",
-            "story_intent_guidance:",
-            "overlay_copy_policy:",
-            "requested_output:",
-            "output_canvas:",
-            "<story>",
-            "<background_briefing>",
-            "<output_canvas>",
-            "<available_media_assets>",
-            "<valid_source_asset_ids>"
-        ]
-
-        let terminators = [
-            "available_media_assets:",
-            "valid_source_asset_ids:",
-            "If images or video previews are attached,",
-            "Additional experiment guidance:",
-            "Additional production guidance:"
-        ]
-
-        var sections: [String] = []
-        for marker in markers {
-            guard let markerRange = originalPrompt.range(of: marker) else { continue }
-            let contentStart = markerRange.upperBound
-            var endIndex = originalPrompt.endIndex
-
-            let candidateTerminators = markers
-                .filter { $0 != marker }
-                .map { "\n\($0)" } + terminators.map { "\n\($0)" }
-            for terminator in candidateTerminators {
-                guard let range = originalPrompt.range(of: terminator, range: contentStart..<originalPrompt.endIndex),
-                      range.lowerBound < endIndex else {
-                    continue
-                }
-                endIndex = range.lowerBound
-            }
-
-            let content = originalPrompt[contentStart..<endIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !content.isEmpty else { continue }
-            sections.append("\(marker)\n\(content)")
-        }
-
-        if let addendumRange = originalPrompt.range(of: "Additional experiment guidance:") {
-            let addendum = originalPrompt[addendumRange.lowerBound..<originalPrompt.endIndex]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !addendum.isEmpty {
-                sections.append(addendum)
-            }
-        }
-        if let addendumRange = originalPrompt.range(of: "Additional production guidance:") {
-            let addendum = originalPrompt[addendumRange.lowerBound..<originalPrompt.endIndex]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !addendum.isEmpty {
-                sections.append(addendum)
-            }
-        }
-
-        let reminder = sections.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard reminder.count > 1_800 else {
-            return reminder
-        }
-
-        let prefix = String(reminder.prefix(1_800)).trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\(prefix)\n[truncated reminder]"
-    }
 }
 
 private enum ReviewToolSchema {

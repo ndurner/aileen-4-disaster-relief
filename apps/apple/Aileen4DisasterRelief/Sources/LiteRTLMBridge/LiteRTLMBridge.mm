@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <strings.h>
 
 #if GEMMA_LITERTLM_LINKED
 #import <Foundation/Foundation.h>
@@ -45,6 +46,32 @@ int ResolveMaxOutputTokens() {
     return 4000;
   }
   return static_cast<int>(parsed);
+}
+
+int ResolveMaxNumTokens() {
+  const char* override = std::getenv("GEMMA_LITERT_MAX_NUM_TOKENS");
+  if (override == nullptr || std::strlen(override) == 0) {
+    return 4096;
+  }
+  char* end = nullptr;
+  const long parsed = std::strtol(override, &end, 10);
+  if (end == override || parsed <= 0 || parsed > 32768) {
+    return 4096;
+  }
+  return static_cast<int>(parsed);
+}
+
+bool ResolveConstrainedDecodingEnabled(const char* tools_json) {
+  if (tools_json == nullptr || std::strlen(tools_json) == 0) {
+    return false;
+  }
+  const char* override = std::getenv("GEMMA_LITERT_CONSTRAINED_DECODING");
+  if (override == nullptr || std::strlen(override) == 0) {
+    return true;
+  }
+  return std::strcmp(override, "0") != 0 &&
+         strcasecmp(override, "false") != 0 &&
+         strcasecmp(override, "no") != 0;
 }
 
 uint64_t CurrentResidentSizeBytes() {
@@ -148,9 +175,13 @@ LiteRtLmEngine* CreateEngine(const char* model_path, const char** error_message)
   @autoreleasepool {
   const char* text_backend = std::getenv("GEMMA_LITERT_TEXT_BACKEND");
   const char* vision_backend = std::getenv("GEMMA_LITERT_VISION_BACKEND");
+  const bool has_text_backend_override =
+      text_backend != nullptr && std::strlen(text_backend) > 0;
+  const bool has_vision_backend_override =
+      vision_backend != nullptr && std::strlen(vision_backend) > 0;
   auto* settings = litert_lm_engine_settings_create(
-      model_path, text_backend != nullptr ? text_backend : "cpu",
-      /*vision_backend_str=*/vision_backend != nullptr ? vision_backend : "cpu",
+      model_path, has_text_backend_override ? text_backend : "cpu",
+      /*vision_backend_str=*/has_vision_backend_override ? vision_backend : "cpu",
       /*audio_backend_str=*/nullptr);
   if (settings == nullptr) {
     if (error_message != nullptr) {
@@ -159,7 +190,8 @@ LiteRtLmEngine* CreateEngine(const char* model_path, const char** error_message)
     return nullptr;
   }
 
-  litert_lm_engine_settings_set_max_num_tokens(settings, 4096);
+  litert_lm_engine_settings_set_max_num_tokens(settings,
+                                               ResolveMaxNumTokens());
   const char* cache_override = std::getenv("GEMMA_LITERT_CACHE_DIR");
   if (cache_override != nullptr && std::strlen(cache_override) > 0) {
     litert_lm_engine_settings_set_cache_dir(settings, cache_override);
@@ -214,17 +246,32 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
   litert_lm_session_config_set_max_output_tokens(session_config,
                                                  ResolveMaxOutputTokens());
 
+  const bool enable_constrained_decoding =
+      ResolveConstrainedDecodingEnabled(tools_json);
   auto* conversation_config = litert_lm_conversation_config_create(
       engine, session_config, system_message_json,
       /*tools_json=*/tools_json, /*messages_json=*/messages_json,
-      /*enable_constrained_decoding=*/false);
-  litert_lm_session_config_delete(session_config);
+      /*enable_constrained_decoding=*/enable_constrained_decoding);
 
   if (conversation_config == nullptr) {
     if (error_message != nullptr) {
       *error_message =
           SetLastError("Failed to create LiteRT-LM conversation config.");
     }
+    if (enable_constrained_decoding) {
+      DebugLog(@"Constrained decoding conversation config failed; retrying without constrained decoding.");
+      conversation_config = litert_lm_conversation_config_create(
+          engine, session_config, system_message_json,
+          /*tools_json=*/tools_json, /*messages_json=*/messages_json,
+          /*enable_constrained_decoding=*/false);
+      if (conversation_config != nullptr && error_message != nullptr) {
+        *error_message = nullptr;
+      }
+    }
+  }
+  litert_lm_session_config_delete(session_config);
+
+  if (conversation_config == nullptr) {
     return nullptr;
   }
 

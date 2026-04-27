@@ -88,8 +88,8 @@ actor GemmaTextRunner {
 
         let response = responsePointer.map { String(cString: $0) } ?? ""
         let incomingMessage = try sanitizedAssistantHistoryMessage(from: response)
-        conversationHistory.append(outgoingMessage)
-        conversationHistory.append(incomingMessage)
+        appendHistoryEntry(outgoingMessage)
+        appendHistoryEntry(incomingMessage)
         return response
     }
 
@@ -158,7 +158,7 @@ actor GemmaTextRunner {
                         }
                     }
 
-                    try withOptionalCString(extraContextJSON) { extraContextCString in
+                    withOptionalCString(extraContextJSON) { extraContextCString in
                         gemma_bridge_session_set_extra_context(activeSession, extraContextCString)
                     }
                     activeModelPath = modelPath
@@ -185,6 +185,14 @@ actor GemmaTextRunner {
     private func sanitizedAssistantHistoryMessage(from messageJSON: String) throws -> Any {
         let object = try parsedHistoryMessage(from: messageJSON)
         return LiteRTResponseParser.sanitizeAssistantHistoryObject(object)
+    }
+
+    private func appendHistoryEntry(_ entry: Any) {
+        if let messages = entry as? [Any] {
+            conversationHistory.append(contentsOf: messages)
+        } else {
+            conversationHistory.append(entry)
+        }
     }
 
     private func serializedHistoryJSON(_ history: [Any]) throws -> String? {
