@@ -69,6 +69,18 @@ final class ProductionWorkflowViewModel: ObservableObject {
         ))
     }
 
+    func removeAsset(_ asset: MediaAsset) {
+        guard let index = assets.firstIndex(where: { $0.id == asset.id }) else { return }
+        let removedAsset = assets.remove(at: index)
+
+        guard FileManager.default.fileExists(atPath: removedAsset.localCopyURL.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: removedAsset.localCopyURL)
+        } catch {
+            latestError = error.localizedDescription
+        }
+    }
+
     func ingestPhotos() async {
         for item in selectedPhotoItems {
             do {

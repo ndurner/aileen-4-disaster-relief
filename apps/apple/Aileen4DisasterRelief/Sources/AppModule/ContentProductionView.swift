@@ -111,6 +111,22 @@ struct ContentProductionView: View {
                                 }
 
                                 Spacer()
+
+                                Button {
+                                    viewModel.removeAsset(asset)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundStyle(.red.opacity(0.82))
+                                        .frame(width: 38, height: 38)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(Color.white.opacity(0.62))
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(viewModel.isRunning)
+                                .accessibilityLabel("Remove \(asset.displayName)")
                             }
                             .padding(14)
                             .background(
