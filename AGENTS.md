@@ -2,6 +2,14 @@ This repository consists of two projects:
     - the iOS app in apps/apple
     - the datacenter part in services/datacenter (not implemented)
 
+Local Gemma 4 model files:
+    - On this workstation, Gemma 4 LiteRT-LM model files are stashed outside the repo in:
+        - `~/dev/gemma4-tests/.model-cache-stash/gemma-4-E2B-it.litertlm`
+        - `~/dev/gemma4-tests/.model-cache-stash/gemma-4-E4B-it.litertlm`
+        - `~/dev/gemma4-tests2/.model-cache-stash/gemma-4-E2B-it.litertlm`
+        - `~/dev/gemma4-tests2/.model-cache-stash/gemma-4-E4B-it.litertlm`
+    - Do not vendor these large model files into this repository.
+
 Dependency and supply-chain policy:
     - Prefer first-party platform frameworks or dependencies we can build from source in our own CI over opaque prebuilt binaries.
     - Do not introduce retired, archived, or effectively unmaintained third-party dependencies unless explicitly approved for a time-boxed prototype.
