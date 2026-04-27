@@ -234,6 +234,7 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
                                          const char* system_message_json,
                                          const char* tools_json,
                                          const char* messages_json,
+                                         int32_t sampler_seed,
                                          const char** error_message) {
   auto* session_config = litert_lm_session_config_create();
   if (session_config == nullptr) {
@@ -245,6 +246,17 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
 
   litert_lm_session_config_set_max_output_tokens(session_config,
                                                  ResolveMaxOutputTokens());
+  if (sampler_seed > 0) {
+    LiteRtLmSamplerParams sampler_params = {
+        .type = kTopP,
+        .top_k = 40,
+        .top_p = 0.95f,
+        .temperature = 1.0f,
+        .seed = sampler_seed,
+    };
+    litert_lm_session_config_set_sampler_params(session_config,
+                                                &sampler_params);
+  }
 
   const bool enable_constrained_decoding =
       ResolveConstrainedDecodingEnabled(tools_json);
@@ -397,6 +409,17 @@ GemmaBridgeSession* gemma_bridge_session_create_with_system_and_tools(
     const char* system_message_json,
     const char* tools_json,
     const char** error_message) {
+  return gemma_bridge_session_create_with_system_tools_and_seed(
+      model_path, system_message_json, tools_json, /*sampler_seed=*/0,
+      error_message);
+}
+
+GemmaBridgeSession* gemma_bridge_session_create_with_system_tools_and_seed(
+    const char* model_path,
+    const char* system_message_json,
+    const char* tools_json,
+    int32_t sampler_seed,
+    const char** error_message) {
   @autoreleasepool {
   if (error_message != nullptr) {
     *error_message = nullptr;
@@ -422,7 +445,8 @@ GemmaBridgeSession* gemma_bridge_session_create_with_system_and_tools(
 
   bridge_session->conversation =
       CreateConversation(bridge_session->engine, system_message_json, tools_json,
-                         /*messages_json=*/nullptr, error_message);
+                         /*messages_json=*/nullptr, sampler_seed,
+                         error_message);
   if (bridge_session->conversation == nullptr) {
     litert_lm_engine_delete(bridge_session->engine);
     delete bridge_session;
@@ -464,6 +488,18 @@ int gemma_bridge_session_recreate_conversation_with_history(
     const char* tools_json,
     const char* messages_json,
     const char** error_message) {
+  return gemma_bridge_session_recreate_conversation_with_history_and_seed(
+      session, system_message_json, tools_json, messages_json,
+      /*sampler_seed=*/0, error_message);
+}
+
+int gemma_bridge_session_recreate_conversation_with_history_and_seed(
+    GemmaBridgeSession* session,
+    const char* system_message_json,
+    const char* tools_json,
+    const char* messages_json,
+    int32_t sampler_seed,
+    const char** error_message) {
   @autoreleasepool {
   if (error_message != nullptr) {
     *error_message = nullptr;
@@ -484,6 +520,7 @@ int gemma_bridge_session_recreate_conversation_with_history(
 
   session->conversation = CreateConversation(session->engine, system_message_json,
                                              tools_json, messages_json,
+                                             sampler_seed,
                                              error_message);
   if (session->conversation != nullptr) {
     session->conversation_generation += 1;

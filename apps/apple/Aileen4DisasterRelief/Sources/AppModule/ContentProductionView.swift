@@ -19,11 +19,24 @@ struct ContentProductionView: View {
         if cloudModeNeedsAPIKey {
             return "Google AI Studio key required"
         }
+        if hasProducedResults {
+            return "Ready to retry"
+        }
         return appState.inferenceMode == .cloud ? "Cloud ready" : "On-device ready"
     }
 
     private var hasProducedResults: Bool {
         !viewModel.producedURLs.isEmpty || !viewModel.postBodyText.isEmpty
+    }
+
+    private var productionButtonTitle: String {
+        if viewModel.isRunning {
+            return "Building the update..."
+        }
+        if hasProducedResults {
+            return "Redo production"
+        }
+        return "Produce visuals and post body"
     }
 
     var body: some View {
@@ -149,11 +162,13 @@ struct ContentProductionView: View {
                 }
 
                 Button {
+                    let retry = hasProducedResults
                     Task {
                         await viewModel.run(
                             backgroundBriefing: appState.backgroundBriefing,
                             story: appState.story,
-                            inference: appState.inferenceConfiguration
+                            inference: appState.inferenceConfiguration,
+                            retry: retry
                         )
                     }
                 } label: {
@@ -161,11 +176,13 @@ struct ContentProductionView: View {
                         if viewModel.isRunning {
                             ProgressView()
                                 .tint(.white)
+                        } else if hasProducedResults {
+                            Image(systemName: "arrow.clockwise")
                         } else {
                             Image(systemName: "sparkles")
                         }
 
-                        Text(viewModel.isRunning ? "Building the update..." : "Produce visuals and post body")
+                        Text(productionButtonTitle)
                     }
                 }
                 .buttonStyle(OceanPrimaryButtonStyle())

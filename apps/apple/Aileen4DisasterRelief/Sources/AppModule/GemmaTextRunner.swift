@@ -17,14 +17,16 @@ actor GemmaTextRunner {
     private var configuredToolsJSON: String?
     private var configuredSystemMessageJSON: String?
     private var configuredExtraContextJSON: String?
+    private var configuredSamplerSeed: Int32?
     private var conversationHistory: [Any] = []
 
-    func makeSession(modelURL: URL) throws {
+    func makeSession(modelURL: URL, samplerSeed: Int32? = nil) throws {
         try configureSession(
             modelURL: modelURL,
             toolsJSON: nil,
             systemMessageJSON: nil,
-            extraContextJSON: nil
+            extraContextJSON: nil,
+            samplerSeed: samplerSeed
         )
     }
 
@@ -32,13 +34,15 @@ actor GemmaTextRunner {
         modelURL: URL,
         toolsJSON: String,
         systemMessageJSON: String? = nil,
-        extraContextJSON: String? = nil
+        extraContextJSON: String? = nil,
+        samplerSeed: Int32? = nil
     ) throws {
         try configureSession(
             modelURL: modelURL,
             toolsJSON: toolsJSON,
             systemMessageJSON: systemMessageJSON,
-            extraContextJSON: extraContextJSON
+            extraContextJSON: extraContextJSON,
+            samplerSeed: samplerSeed
         )
     }
 
@@ -72,6 +76,7 @@ actor GemmaTextRunner {
                 let toolsJSON = configuredToolsJSON
                 let systemMessageJSON = configuredSystemMessageJSON
                 let extraContextJSON = configuredExtraContextJSON
+                let samplerSeed = configuredSamplerSeed
                 let historySnapshot = self.conversationHistory
                 destroyBridgeSession()
                 try configureSession(
@@ -79,6 +84,7 @@ actor GemmaTextRunner {
                     toolsJSON: toolsJSON,
                     systemMessageJSON: systemMessageJSON,
                     extraContextJSON: extraContextJSON,
+                    samplerSeed: samplerSeed,
                     seedHistory: historySnapshot
                 )
                 return try sendRawJSON(messageJSON, allowRecovery: false)
@@ -99,6 +105,7 @@ actor GemmaTextRunner {
         configuredToolsJSON = nil
         configuredSystemMessageJSON = nil
         configuredExtraContextJSON = nil
+        configuredSamplerSeed = nil
         conversationHistory = []
     }
 
@@ -114,9 +121,11 @@ actor GemmaTextRunner {
         toolsJSON: String?,
         systemMessageJSON: String?,
         extraContextJSON: String?,
+        samplerSeed: Int32?,
         seedHistory: [Any] = []
     ) throws {
         let modelPath = modelURL.path
+        let bridgeSamplerSeed = samplerSeed ?? 0
 
         if activeSession != nil, activeModelPath != modelPath {
             destroySession()
@@ -130,18 +139,19 @@ actor GemmaTextRunner {
                             activeSession: activeSession,
                             systemCString: systemCString,
                             toolsCString: toolsCString,
+                            samplerSeed: bridgeSamplerSeed,
                             history: seedHistory
                         )
                     } else {
                         var errorPointer: UnsafePointer<CChar>?
                         let session: OpaquePointer?
-                        if systemCString == nil, toolsCString == nil {
-                            session = gemma_bridge_session_create(modelCString, &errorPointer)
-                        } else if systemCString == nil {
-                            session = gemma_bridge_session_create_with_tools(modelCString, toolsCString, &errorPointer)
-                        } else {
-                            session = gemma_bridge_session_create_with_system_and_tools(modelCString, systemCString, toolsCString, &errorPointer)
-                        }
+                        session = gemma_bridge_session_create_with_system_tools_and_seed(
+                            modelCString,
+                            systemCString,
+                            toolsCString,
+                            bridgeSamplerSeed,
+                            &errorPointer
+                        )
                         guard let session else {
                             let message = errorPointer.map { String(cString: $0) } ?? "Failed to create LiteRT-LM session."
                             throw GemmaTextRunnerError.runtime(message)
@@ -153,6 +163,7 @@ actor GemmaTextRunner {
                                 activeSession: session,
                                 systemCString: systemCString,
                                 toolsCString: toolsCString,
+                                samplerSeed: bridgeSamplerSeed,
                                 history: seedHistory
                             )
                         }
@@ -165,6 +176,7 @@ actor GemmaTextRunner {
                     configuredToolsJSON = toolsJSON
                     configuredSystemMessageJSON = systemMessageJSON
                     configuredExtraContextJSON = extraContextJSON
+                    configuredSamplerSeed = samplerSeed
                     conversationHistory = seedHistory
                 }
             }
@@ -213,6 +225,7 @@ actor GemmaTextRunner {
         activeSession: OpaquePointer,
         systemCString: UnsafePointer<CChar>?,
         toolsCString: UnsafePointer<CChar>?,
+        samplerSeed: Int32,
         history: [Any]
     ) throws {
         let historyJSON = try serializedHistoryJSON(history)
@@ -221,7 +234,8 @@ actor GemmaTextRunner {
                 activeSession: activeSession,
                 systemCString: systemCString,
                 toolsCString: toolsCString,
-                historyCString: historyCString
+                historyCString: historyCString,
+                samplerSeed: samplerSeed
             )
         }
     }
@@ -230,14 +244,16 @@ actor GemmaTextRunner {
         activeSession: OpaquePointer,
         systemCString: UnsafePointer<CChar>?,
         toolsCString: UnsafePointer<CChar>?,
-        historyCString: UnsafePointer<CChar>?
+        historyCString: UnsafePointer<CChar>?,
+        samplerSeed: Int32
     ) throws {
         var errorPointer: UnsafePointer<CChar>?
-        let result = gemma_bridge_session_recreate_conversation_with_history(
+        let result = gemma_bridge_session_recreate_conversation_with_history_and_seed(
             activeSession,
             systemCString,
             toolsCString,
             historyCString,
+            samplerSeed,
             &errorPointer
         )
         guard result == 0 else {

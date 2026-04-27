@@ -51,6 +51,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private let postBodyRunner = GemmaTextRunner()
     private var nextCameraRollAssetNumber = 1
     private var nextImportedFileNumber = 1
+    private var usedRetrySamplerSeeds: Set<Int32> = []
 
     func appendImportedFile(_ sourceURL: URL, displayName overrideDisplayName: String? = nil) throws {
         let targetDirectory = try assetStorageDirectory()
@@ -99,13 +100,19 @@ final class ProductionWorkflowViewModel: ObservableObject {
         selectedPhotoItems = []
     }
 
-    func run(backgroundBriefing: String, story: String, inference: InferenceConfiguration) async {
+    func run(backgroundBriefing: String, story: String, inference: InferenceConfiguration, retry: Bool = false) async {
         isRunning = true
         latestError = nil
         postBodyText = ""
         producedURLs = []
         shareItems = []
         exportDirectoryURL = nil
+        let retrySamplerSeed = retry ? consumeRetrySamplerSeed() : nil
+        if !retry {
+            usedRetrySamplerSeeds.removeAll()
+        } else if let retrySamplerSeed {
+            Self.logger.notice("Retrying on-device production with LiteRT-LM sampler seed \(retrySamplerSeed, privacy: .public)")
+        }
 
         defer { isRunning = false }
 
@@ -115,7 +122,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 try await runOnDevice(
                     backgroundBriefing: backgroundBriefing,
                     story: story,
-                    inference: inference
+                    inference: inference,
+                    samplerSeed: retrySamplerSeed
                 )
             case .cloud:
                 try await runInCloud(
@@ -206,7 +214,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private func runOnDevice(
         backgroundBriefing: String,
         story: String,
-        inference: InferenceConfiguration
+        inference: InferenceConfiguration,
+        samplerSeed: Int32?
     ) async throws {
         let visualAvailability = locator.resolve(inference.onDeviceVisualModel)
         guard let visualURL = visualAvailability.url else {
@@ -218,6 +227,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
         let overlayPreparation = await makeOnDeviceProductionOverlayPreparation(
             productionAssets: productionAssets,
             modelURL: visualURL,
+            samplerSeed: samplerSeed,
             runner: visualRunner
         )
         let toolEngine = GemmaToolCallingEngine(runner: visualRunner)
@@ -236,6 +246,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 outputKind: outputKind,
                 systemMessageJSON: ProductionPrompts.productionSystemMessageJSON,
                 enableThinking: Self.productionOverlayThinkingEnabled,
+                samplerSeed: samplerSeed,
                 protectedRegionProvider: .none,
                 protectedRegionsOverride: overlayPreparation.protectedRegions,
                 layoutGuideOverride: overlayPreparation.layoutGuide
@@ -261,7 +272,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
             modelURL: textURL,
             toolsJSON: PostBodyToolSchema.toolsJSON,
             systemMessageJSON: ProductionPrompts.postBodySystemMessageJSON,
-            extraContextJSON: Self.thinkingExtraContextJSON
+            extraContextJSON: Self.thinkingExtraContextJSON,
+            samplerSeed: samplerSeed
         )
         do {
             let postBodyPrompt = ProductionPrompts.postBodyPrompt(
@@ -363,6 +375,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private func makeOnDeviceProductionOverlayPreparation(
         productionAssets: [ProductionAssetDescriptor],
         modelURL: URL,
+        samplerSeed: Int32?,
         runner: GemmaTextRunner
     ) async -> ProductionOverlayPreparation {
         guard Self.productionGuideProvider != .none else {
@@ -391,6 +404,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 renderedURL: renderedURL,
                 modelURL: modelURL,
                 enableThinking: Self.productionPreAnalysisThinkingEnabled,
+                samplerSeed: samplerSeed,
                 runner: runner
             )
             let canvasSize = AppleMediaTooling.renderCanvasSize(for: outputKind)
@@ -536,6 +550,15 @@ final class ProductionWorkflowViewModel: ObservableObject {
         let name = "Imported File \(nextImportedFileNumber)"
         nextImportedFileNumber += 1
         return sourceURL.pathExtension.isEmpty ? name : "\(name).\(sourceURL.pathExtension.lowercased())"
+    }
+
+    private func consumeRetrySamplerSeed() -> Int32 {
+        var seed: Int32
+        repeat {
+            seed = Int32.random(in: 1...Int32.max)
+        } while usedRetrySamplerSeeds.contains(seed)
+        usedRetrySamplerSeeds.insert(seed)
+        return seed
     }
 
     private func logToolCalls(_ toolCalls: [LiteRTToolCall]) {

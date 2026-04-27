@@ -769,12 +769,14 @@ enum GemmaOverlayVision {
         renderedURL: URL,
         modelURL: URL,
         enableThinking: Bool,
+        samplerSeed: Int32? = nil,
         runner: GemmaTextRunner? = nil
     ) async throws -> OverlayLayoutGuide {
         try await analyzeDetailed(
             renderedURL: renderedURL,
             modelURL: modelURL,
             enableThinking: enableThinking,
+            samplerSeed: samplerSeed,
             runner: runner
         ).guide
     }
@@ -783,6 +785,7 @@ enum GemmaOverlayVision {
         renderedURL: URL,
         modelURL: URL,
         enableThinking: Bool,
+        samplerSeed: Int32? = nil,
         runner: GemmaTextRunner? = nil
     ) async throws -> GemmaOverlayVisionAnalysis {
         let renderedAsset = ProductionAssetDescriptor(
@@ -812,7 +815,8 @@ enum GemmaOverlayVision {
             modelURL: modelURL,
             toolsJSON: OverlayGuideToolSchema.toolsJSON,
             systemMessageJSON: nil,
-            extraContextJSON: extraContextJSON
+            extraContextJSON: extraContextJSON,
+            samplerSeed: samplerSeed
         )
         do {
             let rawResponse = try await activeRunner.sendRawJSON(

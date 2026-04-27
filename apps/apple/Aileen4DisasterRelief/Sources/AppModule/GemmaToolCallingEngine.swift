@@ -74,6 +74,7 @@ actor GemmaToolCallingEngine {
         outputKind: ProductionWorkflowViewModel.OutputKind,
         systemMessageJSON: String,
         enableThinking: Bool = false,
+        samplerSeed: Int32? = nil,
         protectedRegionProvider: OverlayProtectedRegionProvider = .none,
         protectedRegionsOverride: OverlayProtectedRegions = .empty,
         layoutGuideOverride: OverlayLayoutGuide = .empty,
@@ -84,7 +85,8 @@ actor GemmaToolCallingEngine {
             modelURL: modelURL,
             toolsJSON: ProductionToolSchema.toolsJSON,
             systemMessageJSON: systemMessageJSON,
-            extraContextJSON: extraContextJSON
+            extraContextJSON: extraContextJSON,
+            samplerSeed: samplerSeed
         )
         do {
             let tooling = AppleMediaTooling(
@@ -152,6 +154,7 @@ actor GemmaToolCallingEngine {
                     renderedURL: currentProducedURL,
                     renderedAssetID: currentAssetID,
                     enableThinking: enableThinking,
+                    samplerSeed: samplerSeed,
                     tooling: tooling,
                     layoutGuideOverride: layoutGuideOverride,
                     reviewContext: reviewContext,
@@ -187,6 +190,7 @@ actor GemmaToolCallingEngine {
         renderedURL: URL,
         renderedAssetID: String,
         enableThinking: Bool,
+        samplerSeed: Int32?,
         tooling: AppleMediaTooling,
         layoutGuideOverride: OverlayLayoutGuide,
         reviewContext: OverlayReviewContext?,
@@ -197,7 +201,8 @@ actor GemmaToolCallingEngine {
             modelURL: modelURL,
             toolsJSON: ReviewToolSchema.toolsJSON(allowsAccept: mode.allowsAccept),
             systemMessageJSON: ReviewToolSchema.systemMessageJSON(allowsAccept: mode.allowsAccept),
-            extraContextJSON: extraContextJSON
+            extraContextJSON: extraContextJSON,
+            samplerSeed: samplerSeed
         )
         let renderedAsset = ProductionAssetDescriptor(
             toolID: renderedAssetID,
