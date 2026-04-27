@@ -13,8 +13,8 @@ struct SettingsView: View {
         OceanScreen {
             AileenWorkflowCard(
                     imageName: "AileenSettingsScene",
-                    title: "Choose my tools",
-                    message: "Switch between on-device LiteRT inference and hosted Gemma 4 inference through Google AI Studio."
+                    title: "Choose how I work",
+                    message: "Run on this device or in the cloud."
                 ) {
                 inferenceModePicker
 
