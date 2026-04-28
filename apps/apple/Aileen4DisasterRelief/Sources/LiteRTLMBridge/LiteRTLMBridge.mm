@@ -249,7 +249,7 @@ LiteRtLmConversation* CreateConversation(LiteRtLmEngine* engine,
   if (sampler_seed > 0) {
     LiteRtLmSamplerParams sampler_params = {
         .type = kTopP,
-        .top_k = 40,
+        .top_k = 64,
         .top_p = 0.95f,
         .temperature = 1.0f,
         .seed = sampler_seed,
