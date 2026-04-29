@@ -5,7 +5,7 @@ Aileen 4 Disaster Relief.
 
 Expected future responsibilities:
 
-- remote FFmpeg or media-rendering workers
+- server-side media-rendering workers if product needs outgrow the Apple client
 - higher-throughput model serving
 - orchestration APIs for Apple clients
 - shared asset and campaign state

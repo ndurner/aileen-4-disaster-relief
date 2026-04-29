@@ -10,7 +10,9 @@ Current focus:
 
 - persistent background briefing
 - content-production workflow with imported media assets
-- local Gemma 4 LiteRT model management
+- selectable on-device LiteRT-LM or hosted Gemini API inference
+- local Gemma 4 LiteRT model management for on-device runs
+- Gemini API key and hosted Gemma 4 model settings for cloud runs
 - on-device Apple-native media tool-calling orchestration
 - shareable visual and text outputs
 
@@ -30,6 +32,8 @@ Apple-specific support files live alongside the app:
 - `apps/apple/scripts/bootstrap_google_ai_edge_artifacts.sh`: regenerates the
   Apple binaries from official Google sources instead of relying on opaque local
   copies
+- `apps/apple/overlay-lab/`: segregated overlay experiments, local render
+  checks, and simulator-driven Gemma overlay runs
 
 ## Checkout Bootstrap
 
