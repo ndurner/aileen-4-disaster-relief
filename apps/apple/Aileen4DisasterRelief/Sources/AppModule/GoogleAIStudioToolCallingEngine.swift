@@ -7,11 +7,6 @@ actor GoogleAIStudioToolCallingEngine {
         subsystem: Bundle.main.bundleIdentifier ?? "Aileen4DisasterRelief",
         category: "HostedGemmaConversation"
     )
-    private static let toolSelectionSystemInstruction = """
-    You are choosing arguments for a native Gemini function call.
-    Call the requested function once.
-    Do not add explanatory text.
-    """
 
     private let client: GoogleAIStudioClient
 
@@ -56,7 +51,7 @@ actor GoogleAIStudioToolCallingEngine {
         var response = try await client.sendGenerateContent(
             model: model,
             contents: GoogleAIStudioContents(value: contents),
-            systemInstruction: Self.toolSelectionSystemInstruction,
+            systemInstruction: systemInstruction,
             toolsJSON: ProductionToolSchema.toolsJSON,
             toolConfig: .constrainedToAllowedFunctions(firstAllowedFunctions)
         )
@@ -117,7 +112,7 @@ actor GoogleAIStudioToolCallingEngine {
             response = try await client.sendGenerateContent(
                 model: model,
                 contents: GoogleAIStudioContents(value: contents),
-                systemInstruction: Self.toolSelectionSystemInstruction,
+                systemInstruction: systemInstruction,
                 toolsJSON: ProductionToolSchema.toolsJSON,
                 toolConfig: .constrainedToAllowedFunctions(allowedFunctionNames)
             )
@@ -140,14 +135,6 @@ actor GoogleAIStudioToolCallingEngine {
         )
     }
 
-    static func toolCallingPrompt(taskPrompt: String, toolsJSON: String) -> String {
-        """
-        \(taskPrompt)
-
-        Use the provided function tools for any structured output. If you call a function, do not add extra explanatory text.
-        """
-    }
-
     private func composeTurnPrompt(from initialPrompt: String) -> String {
         """
         \(initialPrompt)
@@ -168,7 +155,7 @@ actor GoogleAIStudioToolCallingEngine {
             return ["add_text_overlay"]
         }
         if names.contains("add_text_overlay") || names.contains("move_text_overlay") {
-            return ["accept_overlay_layout"]
+            return ["move_text_overlay", "accept_overlay_layout"]
         }
         return nil
     }

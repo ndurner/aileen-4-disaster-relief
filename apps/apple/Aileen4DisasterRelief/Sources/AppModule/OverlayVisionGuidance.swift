@@ -722,11 +722,21 @@ enum OverlayGuideToolSchema {
 
     static func extract(fromRaw raw: String, fallbackText: String) -> OverlayLayoutGuide {
         let parsed = LiteRTResponseParser.parse(raw)
+        return extract(from: parsed, fallbackText: fallbackText)
+    }
+
+    static func extract(from parsed: LiteRTParsedMessage, fallbackText: String) -> OverlayLayoutGuide {
         guard let toolCall = parsed.toolCalls.first(where: { $0.name == toolName }) else {
             return .empty
         }
 
-        let arguments = toolCall.arguments
+        return extract(fromArguments: toolCall.arguments, fallbackText: fallbackText)
+    }
+
+    private static func extract(
+        fromArguments arguments: [String: LiteRTToolValue],
+        fallbackText: String
+    ) -> OverlayLayoutGuide {
         let subjectRect = rect(
             x: arguments["subject_x"]?.numberValue,
             y: arguments["subject_y"]?.numberValue,

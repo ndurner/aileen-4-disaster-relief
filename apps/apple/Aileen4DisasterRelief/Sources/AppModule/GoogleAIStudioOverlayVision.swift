@@ -25,8 +25,7 @@ enum GoogleAIStudioOverlayVision {
         Prefer sticker for busy subject-dominant frames, caption for real negative space, headline only when a single line can stay legible without a box, and tag only for an actual handle or label.
         You may optionally return one coarse free-space patch if it is obvious, but subject protection matters more than patch precision.
         If there is no truly clean patch, omit the slot fields or return a very low slot_confidence and explain the compromise in notes.
-        Return only one JSON object with these keys when known: subject_x, subject_y, subject_width, subject_height, subject_confidence, slot_x, slot_y, slot_width, slot_height, slot_confidence, recommended_style, recommended_top_fraction, recommended_max_width_fraction, recommended_target_line_count, horizontal_anchor, vertical_anchor, notes.
-        Do not include markdown fences, bullet points, or explanatory prose outside the JSON object.
+        Call \(OverlayGuideToolSchema.toolName) with the overlay placement guide.
         """
 
         let client = GoogleAIStudioClient(apiKey: apiKey)
@@ -34,11 +33,12 @@ enum GoogleAIStudioOverlayVision {
             model: model,
             contents: GoogleAIStudioContents(value: [
                 try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [renderedAsset])
-            ])
+            ]),
+            toolsJSON: OverlayGuideToolSchema.toolsJSON,
+            toolConfig: .constrainedToAllowedFunctions([OverlayGuideToolSchema.toolName])
         )
-        let rawResponse = response.parsedMessage.rawJSON
         let parsed = response.parsedMessage
-        var guide = extractGuide(from: parsed.text)
+        var guide = OverlayGuideToolSchema.extract(from: parsed, fallbackText: parsed.text)
 
         if shouldApplyFallback(to: guide, canvasSize: canvasSize) {
             let fallbackGuide = OverlayLayoutGuidance.makeGuide(
@@ -68,77 +68,9 @@ enum GoogleAIStudioOverlayVision {
         return GemmaOverlayVisionAnalysis(
             prompt: prompt,
             guide: guide,
-            rawResponses: [rawResponse],
-            thoughtTraces: []
+            rawResponses: [response.rawResponseJSON],
+            thoughtTraces: parsed.thoughtText.isEmpty ? [] : [parsed.thoughtText]
         )
-    }
-
-    private static func extractGuide(from text: String) -> OverlayLayoutGuide {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let object = parseJSONObject(from: trimmed) else {
-            return .empty
-        }
-
-        let arguments = GoogleAIStudioResponseParser.toolArguments(from: object)
-        let subjectRect = rect(
-            x: arguments["subject_x"]?.numberValue,
-            y: arguments["subject_y"]?.numberValue,
-            width: arguments["subject_width"]?.numberValue,
-            height: arguments["subject_height"]?.numberValue
-        )
-        let slotRect = rect(
-            x: arguments["slot_x"]?.numberValue,
-            y: arguments["slot_y"]?.numberValue,
-            width: arguments["slot_width"]?.numberValue,
-            height: arguments["slot_height"]?.numberValue
-        )
-
-        return OverlayLayoutGuide(
-            provider: .gemmaVision,
-            subjectRect: subjectRect,
-            subjectConfidence: arguments["subject_confidence"]?.numberValue,
-            slotRect: slotRect,
-            slotConfidence: arguments["slot_confidence"]?.numberValue,
-            recommendedStyle: arguments["recommended_style"]?.stringValue.flatMap(OverlayStyle.init(rawValue:)),
-            recommendedTopFraction: arguments["recommended_top_fraction"]?.numberValue,
-            recommendedMaxWidthFraction: arguments["recommended_max_width_fraction"]?.numberValue,
-            recommendedTargetLineCount: arguments["recommended_target_line_count"]?.numberValue.map { Int($0.rounded()) },
-            horizontalAnchor: arguments["horizontal_anchor"]?.stringValue.flatMap(OverlayHorizontalAnchor.init(rawValue:)),
-            verticalAnchor: arguments["vertical_anchor"]?.stringValue.flatMap(OverlayVerticalAnchor.init(rawValue:)),
-            notes: arguments["notes"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? trimmed
-        )
-    }
-
-    private static func parseJSONObject(from text: String) -> [String: Any]? {
-        let stripped = text
-            .replacingOccurrences(of: "```json", with: "")
-            .replacingOccurrences(of: "```", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let data = stripped.data(using: .utf8),
-           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            return object
-        }
-
-        guard let start = stripped.firstIndex(of: "{"),
-              let end = stripped.lastIndex(of: "}") else {
-            return nil
-        }
-
-        let candidate = String(stripped[start...end])
-        guard let data = candidate.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return object
-    }
-
-    private static func rect(x: Double?, y: Double?, width: Double?, height: Double?) -> CGRect? {
-        guard let x, let y, let width, let height, width > 0, height > 0 else {
-            return nil
-        }
-        return CGRect(x: x, y: y, width: width, height: height).integral
     }
 
     private static func shouldApplyFallback(to guide: OverlayLayoutGuide, canvasSize: CGSize) -> Bool {
