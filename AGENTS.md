@@ -10,6 +10,12 @@ Local Gemma 4 model files:
         - `~/dev/gemma4-tests2/.model-cache-stash/gemma-4-E4B-it.litertlm`
     - Do not vendor these large model files into this repository.
 
+README maintenance:
+    - Keep README files in sync with product behavior, supported runtimes, setup commands, and architecture changes.
+    - When changing model providers, API surfaces, media rendering paths, project generation, folder organization, or developer workflows, check whether the root `README.md`, `apps/apple/README.md`, `apps/apple/overlay-lab/README.md`, or `services/datacenter/README.md` also need updates.
+    - Prefer documenting the actual runtime/API surface over where credentials or artifacts were obtained. For example, cloud Gemma calls should be described as Gemini API usage unless the Google AI Studio product surface itself is material.
+    - Remove or rewrite stale roadmap wording when implementation takes a different path; do not leave obsolete "future" or "incomplete" notes in place after the feature lands differently.
+
 Dependency and supply-chain policy:
     - Prefer first-party platform frameworks or dependencies we can build from source in our own CI over opaque prebuilt binaries.
     - Do not introduce retired, archived, or effectively unmaintained third-party dependencies unless explicitly approved for a time-boxed prototype.
