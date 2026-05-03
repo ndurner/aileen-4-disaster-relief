@@ -14,24 +14,30 @@ struct SettingsView: View {
             AileenWorkflowCard(
                     imageName: "AileenSettingsScene",
                     title: "Choose how I work",
-                    message: "Run on this device or in the cloud."
+                    message: "Create the post now or prepare it for a teammate to finish later."
                 ) {
-                inferenceModePicker
+                productionExecutionModePicker
 
-                if appState.inferenceMode == .onDevice {
-                    onDeviceModelPicker(title: "Visual model", selection: $appState.selectedProductionModel)
-                    onDeviceModelPicker(title: "Post body model", selection: $appState.selectedTextModel)
-                } else {
-                    cloudModelPicker(title: "Visual model", selection: $appState.selectedCloudProductionModel)
-                    cloudModelPicker(title: "Post body model", selection: $appState.selectedCloudTextModel)
+                processingLocationPicker
+
+                if appState.productionExecutionMode == .field {
+                    if appState.inferenceMode == .onDevice {
+                        onDeviceModelPicker(title: "Visual model", selection: $appState.selectedProductionModel)
+                        onDeviceModelPicker(title: "Post body model", selection: $appState.selectedTextModel)
+                    } else {
+                        cloudModelPicker(title: "Visual model", selection: $appState.selectedCloudProductionModel)
+                        cloudModelPicker(title: "Post body model", selection: $appState.selectedCloudTextModel)
+                    }
                 }
             }
 
-            if appState.inferenceMode == .onDevice {
-                onDeviceModelsCard
-                importCard
-            } else {
-                googleAIStudioCard
+            if appState.productionExecutionMode == .field {
+                if appState.inferenceMode == .onDevice {
+                    onDeviceModelsCard
+                    importCard
+                } else {
+                    googleAIStudioCard
+                }
             }
         }
         .fileImporter(
@@ -68,18 +74,70 @@ struct SettingsView: View {
         }
     }
 
-    private var inferenceModePicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Inference mode")
+    private var productionExecutionModePicker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Work mode")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(OceanPalette.ink)
 
-            Picker("Inference mode", selection: $appState.inferenceMode) {
+            Picker("Work mode", selection: $appState.productionExecutionMode) {
+                ForEach(ProductionExecutionMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            VStack(spacing: 10) {
+                ForEach(ProductionExecutionMode.allCases) { mode in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: appState.productionExecutionMode == mode ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(appState.productionExecutionMode == mode ? OceanPalette.reef : OceanPalette.ink.opacity(0.42))
+                            .padding(.top, 2)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(mode.displayName) Mode: \(mode.shortLabel)")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundStyle(OceanPalette.ink)
+
+                            Text(mode.detail)
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.white.opacity(appState.productionExecutionMode == mode ? 0.62 : 0.42))
+                    )
+                }
+            }
+        }
+    }
+
+    private var processingLocationPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Where to create")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(OceanPalette.ink)
+
+            Picker("Where to create", selection: $appState.inferenceMode) {
                 ForEach(InferenceMode.allCases) { mode in
                     Text(mode.displayName).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
+            .disabled(appState.productionExecutionMode == .desk)
+
+            if appState.productionExecutionMode == .desk {
+                Text("In Desk Mode this choice is saved for later, but nothing is created here.")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(OceanPalette.ink.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -126,7 +184,7 @@ struct SettingsView: View {
             }
             .buttonStyle(OceanPrimaryButtonStyle())
 
-            Text("Any imported `.litertlm` file is treated as an on-device model, just like a model copied in by the shared device script.")
+            Text("Imported files are available for creating posts on this device.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OceanPalette.ink.opacity(0.64))
                 .fixedSize(horizontal: false, vertical: true)
@@ -169,12 +227,12 @@ struct SettingsView: View {
                 )
             }
 
-            Text("Cloud mode uses the Gemma 4 models Google currently exposes through AI Studio: Gemma 4 26B A4B and Gemma 4 31B.")
+            Text("Cloud mode sends the post materials to a hosted model and returns the finished media and text.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OceanPalette.ink.opacity(0.68))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Requests go straight to Google-hosted Gemma 4 models through the Gemini API. OpenRouter-specific routing controls such as Exacto no longer apply.")
+            Text("Use this when the device is too slow or does not have a local model ready.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OceanPalette.ink.opacity(0.64))
                 .fixedSize(horizontal: false, vertical: true)

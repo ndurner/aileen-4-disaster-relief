@@ -29,10 +29,20 @@ enum GoogleAIStudioOverlayVision {
         """
 
         let client = GoogleAIStudioClient(apiKey: apiKey)
+        let fileReferences = try await uploadCloudFiles([renderedAsset], using: client)
+        defer {
+            Task {
+                await deleteCloudFiles(fileReferences, using: client)
+            }
+        }
         let response = try await client.sendGenerateContent(
             model: model,
             contents: GoogleAIStudioContents(value: [
-                try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [renderedAsset])
+                try GoogleAIStudioMessageFactory.userMessage(
+                    text: prompt,
+                    assets: [renderedAsset],
+                    fileReferences: fileReferences
+                )
             ]),
             toolsJSON: OverlayGuideToolSchema.toolsJSON,
             toolConfig: .constrainedToAllowedFunctions([OverlayGuideToolSchema.toolName])
@@ -89,5 +99,34 @@ enum GoogleAIStudioOverlayVision {
             return true
         }
         return slotRect.width <= 0 || slotRect.height <= 0 || canvasSize.width <= 0 || canvasSize.height <= 0
+    }
+
+    private static func uploadCloudFiles(
+        _ assets: [ProductionAssetDescriptor],
+        using client: GoogleAIStudioClient
+    ) async throws -> [String: GoogleAIStudioFileReference] {
+        var fileReferences: [String: GoogleAIStudioFileReference] = [:]
+        do {
+            for asset in assets {
+                try Task.checkCancellation()
+                guard let uploadFile = try PromptMediaEncoder.promptUploadFile(for: asset.mediaAsset) else {
+                    continue
+                }
+                fileReferences[asset.toolID] = try await client.uploadFile(uploadFile)
+            }
+            return fileReferences
+        } catch {
+            await deleteCloudFiles(fileReferences, using: client)
+            throw error
+        }
+    }
+
+    private static func deleteCloudFiles(
+        _ fileReferences: [String: GoogleAIStudioFileReference],
+        using client: GoogleAIStudioClient
+    ) async {
+        for fileReference in fileReferences.values {
+            await client.deleteFile(fileReference)
+        }
     }
 }

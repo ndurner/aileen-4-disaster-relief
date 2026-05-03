@@ -60,6 +60,10 @@ final class AppState: ObservableObject {
         didSet { defaults.set(inferenceMode.rawValue, forKey: Keys.inferenceMode) }
     }
 
+    @Published var productionExecutionMode: ProductionExecutionMode {
+        didSet { defaults.set(productionExecutionMode.rawValue, forKey: Keys.productionExecutionMode) }
+    }
+
     @Published var googleAIStudioAPIKey: String {
         didSet { try? googleAIStudioAPIKeyStore.save(googleAIStudioAPIKey) }
     }
@@ -82,6 +86,7 @@ final class AppState: ObservableObject {
         selectedCloudProductionModel = CloudModelOption(rawValue: defaults.string(forKey: Keys.selectedCloudProductionModel) ?? "") ?? .gemma426bA4B
         selectedCloudTextModel = CloudModelOption(rawValue: defaults.string(forKey: Keys.selectedCloudTextModel) ?? "") ?? .gemma431B
         inferenceMode = InferenceMode(rawValue: defaults.string(forKey: Keys.inferenceMode) ?? "") ?? .onDevice
+        productionExecutionMode = ProductionExecutionMode(rawValue: defaults.string(forKey: Keys.productionExecutionMode) ?? "") ?? .field
         googleAIStudioAPIKey = (try? googleAIStudioAPIKeyStore.load()) ?? ""
         selectedTab = AppState.initialSelectedTab(defaults: defaults, backgroundBriefing: storedBackgroundBriefing)
     }
@@ -122,6 +127,7 @@ final class AppState: ObservableObject {
         static let selectedCloudProductionModel = "selectedCloudProductionModel"
         static let selectedCloudTextModel = "selectedCloudTextModel"
         static let inferenceMode = "inferenceMode"
+        static let productionExecutionMode = "productionExecutionMode"
         static let selectedTab = "selectedTab"
     }
 }

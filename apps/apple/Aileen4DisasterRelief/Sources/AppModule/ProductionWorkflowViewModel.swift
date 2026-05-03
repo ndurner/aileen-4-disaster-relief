@@ -37,6 +37,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
     @Published var shareItems: [Any] = []
     @Published var exportDirectoryURL: URL?
     @Published var latestError: String?
+    @Published var currentStatusDetail: String?
+    @Published var deskHandoffReady = false
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "Aileen4DisasterRelief",
@@ -53,6 +55,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private var nextCameraRollAssetNumber = 1
     private var nextImportedFileNumber = 1
     private var usedRetrySamplerSeeds: Set<Int32> = []
+    private var packageRawStory = ""
+    private var packageExecutionMode: ProductionExecutionMode = .field
 
     func appendImportedFile(
         _ sourceURL: URL,
@@ -74,11 +78,13 @@ final class ProductionWorkflowViewModel: ObservableObject {
             displayName: overrideDisplayName ?? sourceURL.lastPathComponent,
             importSource: importSource
         ))
+        deskHandoffReady = false
     }
 
     func removeAsset(_ asset: MediaAsset) {
         guard let index = assets.firstIndex(where: { $0.id == asset.id }) else { return }
         let removedAsset = assets.remove(at: index)
+        deskHandoffReady = false
 
         guard FileManager.default.fileExists(atPath: removedAsset.localCopyURL.path) else { return }
         do {
@@ -106,7 +112,13 @@ final class ProductionWorkflowViewModel: ObservableObject {
         selectedPhotoItems = []
     }
 
-    func run(backgroundBriefing: String, story: String, inference: InferenceConfiguration, retry: Bool = false) async {
+    func run(
+        backgroundBriefing: String,
+        story: String,
+        executionMode: ProductionExecutionMode,
+        inference: InferenceConfiguration,
+        retry: Bool = false
+    ) async {
         guard !assets.isEmpty else {
             latestError = "Add at least one media asset before producing visuals."
             return
@@ -114,38 +126,69 @@ final class ProductionWorkflowViewModel: ObservableObject {
 
         isRunning = true
         latestError = nil
+        currentStatusDetail = startingStatusDetail(executionMode: executionMode, inferenceMode: inference.mode)
         postBodyText = ""
         producedURLs = []
         shareItems = []
         exportDirectoryURL = nil
-        let retrySamplerSeed = retry ? consumeRetrySamplerSeed() : nil
-        if !retry {
+        deskHandoffReady = false
+        packageRawStory = story
+        packageExecutionMode = executionMode
+        let retrySamplerSeed = executionMode == .field && retry ? consumeRetrySamplerSeed() : nil
+        if executionMode != .field || !retry {
             usedRetrySamplerSeeds.removeAll()
         } else if let retrySamplerSeed {
             Self.logger.notice("Retrying on-device production with LiteRT-LM sampler seed \(retrySamplerSeed, privacy: .public)")
         }
 
-        defer { isRunning = false }
+        defer {
+            isRunning = false
+            currentStatusDetail = nil
+        }
 
         do {
-            switch inference.mode {
-            case .onDevice:
-                try await runOnDevice(
-                    backgroundBriefing: backgroundBriefing,
-                    story: story,
-                    inference: inference,
-                    samplerSeed: retrySamplerSeed
-                )
-            case .cloud:
-                try await runInCloud(
-                    backgroundBriefing: backgroundBriefing,
-                    story: story,
-                    inference: inference
-                )
+            switch executionMode {
+            case .field:
+                switch inference.mode {
+                case .onDevice:
+                    try await runOnDevice(
+                        backgroundBriefing: backgroundBriefing,
+                        story: story,
+                        inference: inference,
+                        samplerSeed: retrySamplerSeed
+                    )
+                case .cloud:
+                    try await runInCloud(
+                        backgroundBriefing: backgroundBriefing,
+                        story: story,
+                        inference: inference
+                    )
+                }
+            case .desk:
+                try await runDeskHandoff()
             }
         } catch {
-            latestError = error.localizedDescription
+            latestError = Self.isCancellation(error)
+                ? "Production was canceled before it completed."
+                : error.localizedDescription
         }
+    }
+
+    private func startingStatusDetail(executionMode: ProductionExecutionMode, inferenceMode: InferenceMode) -> String {
+        switch executionMode {
+        case .field:
+            return inferenceMode == .cloud ? "Starting cloud production" : "Starting on-device production"
+        case .desk:
+            return "Preparing package"
+        }
+    }
+
+    private func runDeskHandoff() async throws {
+        currentStatusDetail = "Collecting raw inputs"
+        try Task.checkCancellation()
+        deskHandoffReady = true
+        shareItems = []
+        currentStatusDetail = "Package ready"
     }
 
     func prepareExportDirectory() throws -> URL {
@@ -176,21 +219,41 @@ final class ProductionWorkflowViewModel: ObservableObject {
     }
 
     private func copyPackageMediaAssets(to mediaDirectory: URL) throws -> [AileenPackageMediaItem] {
-        try producedURLs.enumerated().map { offset, sourceURL in
-            let filename = packageMediaFilename(for: sourceURL, index: offset)
-            let destinationURL = mediaDirectory.appendingPathComponent(filename, isDirectory: false)
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
+        switch packageExecutionMode {
+        case .field:
+            return try producedURLs.enumerated().map { offset, sourceURL in
+                let filename = packageMediaFilename(for: sourceURL, index: offset)
+                let destinationURL = mediaDirectory.appendingPathComponent(filename, isDirectory: false)
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+                return AileenPackageMediaItem(
+                    id: "media_\(String(format: "%03d", offset + 1))",
+                    filename: "media/\(filename)",
+                    type: packageMediaType(for: sourceURL),
+                    sourceType: packageSourceTypeForProducedMedia(),
+                    gpsCoordinate: sourceGPSCoordinateForProducedMedia(),
+                    url: destinationURL
+                )
             }
-            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-            return AileenPackageMediaItem(
-                id: "media_\(String(format: "%03d", offset + 1))",
-                filename: "media/\(filename)",
-                type: packageMediaType(for: sourceURL),
-                sourceType: packageSourceTypeForProducedMedia(),
-                gpsCoordinate: sourceGPSCoordinateForProducedMedia(),
-                url: destinationURL
-            )
+        case .desk:
+            return try assets.enumerated().map { offset, asset in
+                let filename = packageMediaFilename(for: asset.localCopyURL, index: offset)
+                let destinationURL = mediaDirectory.appendingPathComponent(filename, isDirectory: false)
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.copyItem(at: asset.localCopyURL, to: destinationURL)
+                return AileenPackageMediaItem(
+                    id: "media_\(String(format: "%03d", offset + 1))",
+                    filename: "media/\(filename)",
+                    type: asset.kind == .movie ? "video" : "photo",
+                    sourceType: packageSourceType(for: asset),
+                    gpsCoordinate: GPSMetadataReader.coordinate(for: asset),
+                    url: destinationURL
+                )
+            }
         }
     }
 
@@ -253,15 +316,22 @@ final class ProductionWorkflowViewModel: ObservableObject {
             "aileen_job_version: 1",
             "",
             "execution:",
-            "  mode: field_completed"
+            "  mode: \(packageExecutionMode == .desk ? "remote_generate" : "field_completed")"
         ]
 
+        let rawStory = packageRawStory.trimmingCharacters(in: .whitespacesAndNewlines)
         let postBody = postBodyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !postBody.isEmpty {
+        if !rawStory.isEmpty || !postBody.isEmpty {
             lines.append("")
             lines.append("story:")
-            lines.append("  post_body: |-")
-            lines.append(contentsOf: yamlBlockLines(postBody, indentation: "    "))
+            if !rawStory.isEmpty {
+                lines.append("  raw: |-")
+                lines.append(contentsOf: yamlBlockLines(rawStory, indentation: "    "))
+            }
+            if !postBody.isEmpty {
+                lines.append("  post_body: |-")
+                lines.append(contentsOf: yamlBlockLines(postBody, indentation: "    "))
+            }
         }
 
         if !media.isEmpty {
@@ -343,12 +413,14 @@ final class ProductionWorkflowViewModel: ObservableObject {
 
         let productionAssets = makeProductionAssets()
         let visualRunner = GemmaTextRunner()
+        currentStatusDetail = "Preparing on-device overlay guidance"
         let overlayPreparation = await makeOnDeviceProductionOverlayPreparation(
             productionAssets: productionAssets,
             modelURL: visualURL,
             samplerSeed: samplerSeed,
             runner: visualRunner
         )
+        try Task.checkCancellation()
         let toolEngine = GemmaToolCallingEngine(runner: visualRunner)
         let contentPrompt = makeProductionPrompt(
             backgroundBriefing: backgroundBriefing,
@@ -357,6 +429,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
             supplementalAddendum: overlayPreparation.promptAddendum
         )
         let toolResult: ToolExecutionResult
+        currentStatusDetail = "Generating visual on device"
         do {
             toolResult = try await toolEngine.run(
                 initialPrompt: contentPrompt,
@@ -387,6 +460,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
             throw GemmaTextRunnerError.runtime(textAvailability.detail)
         }
 
+        currentStatusDetail = "Preparing on-device post body"
         try await postBodyRunner.makeToolSession(
             modelURL: textURL,
             toolsJSON: PostBodyToolSchema.toolsJSON,
@@ -399,6 +473,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 backgroundBriefing: backgroundBriefing,
                 story: story
             )
+            currentStatusDetail = "Generating post body on device"
             let parsed = try await postBodyRunner.sendJSON(
                 ProductionToolSchema.userMessageJSON(text: postBodyPrompt, assets: productionAssets)
             )
@@ -421,12 +496,29 @@ final class ProductionWorkflowViewModel: ObservableObject {
         }
 
         let productionAssets = makeProductionAssets()
+        let client = GoogleAIStudioClient(apiKey: inference.cloudAPIKey)
+        currentStatusDetail = "Uploading media to Gemini Files API"
+        let cloudFileReferences = try await uploadCloudFiles(
+            productionAssets,
+            using: client
+        )
+        defer {
+            Task {
+                await Self.deleteCloudFiles(cloudFileReferences, using: client)
+            }
+        }
+
+        currentStatusDetail = "Preparing cloud overlay guidance"
         let overlayPreparation = await makeCloudProductionOverlayPreparation(
             productionAssets: productionAssets,
             model: inference.cloudVisualModel,
             apiKey: inference.cloudAPIKey
         )
-        let toolEngine = GoogleAIStudioToolCallingEngine(apiKey: inference.cloudAPIKey)
+        try Task.checkCancellation()
+        let toolEngine = GoogleAIStudioToolCallingEngine(
+            apiKey: inference.cloudAPIKey,
+            fileReferences: cloudFileReferences
+        )
         let contentPrompt = makeProductionPrompt(
             backgroundBriefing: backgroundBriefing,
             story: story,
@@ -434,6 +526,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
             supplementalAddendum: overlayPreparation.promptAddendum
         )
         let toolResult: ToolExecutionResult
+        currentStatusDetail = "Calling Gemini API for visual generation"
         do {
             toolResult = try await toolEngine.run(
                 initialPrompt: contentPrompt,
@@ -460,8 +553,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
             backgroundBriefing: backgroundBriefing,
             story: story
         )
-        let client = GoogleAIStudioClient(apiKey: inference.cloudAPIKey)
         let response: GoogleAIStudioGenerateContentResponse
+        currentStatusDetail = "Calling Gemini API for post body"
         logHostedGemmaConsoleTurn(
             label: "post body user turn 1",
             text: postBodyPrompt,
@@ -473,7 +566,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 contents: GoogleAIStudioContents(value: [
                     try GoogleAIStudioMessageFactory.userMessage(
                         text: postBodyPrompt,
-                        assets: productionAssets
+                        assets: productionAssets,
+                        fileReferences: cloudFileReferences
                     )
                 ]),
                 systemInstruction: ProductionPrompts.postBodySystemInstruction,
@@ -627,6 +721,42 @@ final class ProductionWorkflowViewModel: ObservableObject {
             return .runtime(stage)
         }
         return .runtime("\(stage): \(detail)")
+    }
+
+    private func uploadCloudFiles(
+        _ assets: [ProductionAssetDescriptor],
+        using client: GoogleAIStudioClient
+    ) async throws -> [String: GoogleAIStudioFileReference] {
+        var fileReferences: [String: GoogleAIStudioFileReference] = [:]
+        do {
+            for asset in assets {
+                try Task.checkCancellation()
+                guard let uploadFile = try PromptMediaEncoder.promptUploadFile(for: asset.mediaAsset) else {
+                    continue
+                }
+                fileReferences[asset.toolID] = try await client.uploadFile(uploadFile)
+            }
+            return fileReferences
+        } catch {
+            await Self.deleteCloudFiles(fileReferences, using: client)
+            throw error
+        }
+    }
+
+    private static func deleteCloudFiles(
+        _ fileReferences: [String: GoogleAIStudioFileReference],
+        using client: GoogleAIStudioClient
+    ) async {
+        for fileReference in fileReferences.values {
+            await client.deleteFile(fileReference)
+        }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
     }
 
     private func assetStorageDirectory() throws -> URL {

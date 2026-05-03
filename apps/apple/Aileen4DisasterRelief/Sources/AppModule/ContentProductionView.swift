@@ -7,14 +7,18 @@ struct ContentProductionView: View {
     @StateObject private var viewModel = ProductionWorkflowViewModel()
     @State private var fileImporterPresented = false
     @State private var shareSheetPresented = false
+    @State private var productionTask: Task<Void, Never>?
 
     private var cloudModeNeedsAPIKey: Bool {
-        appState.inferenceMode == .cloud && !appState.hasGoogleAIStudioAPIKey
+        appState.productionExecutionMode == .field && appState.inferenceMode == .cloud && !appState.hasGoogleAIStudioAPIKey
     }
 
     private var productionStatusDetail: String {
         if viewModel.isRunning {
-            return "Working"
+            return viewModel.currentStatusDetail ?? "Working"
+        }
+        if hasIssue {
+            return "Needs attention"
         }
         if cloudModeNeedsAPIKey {
             return "Google AI Studio key required"
@@ -22,7 +26,10 @@ struct ContentProductionView: View {
         if viewModel.assets.isEmpty {
             return "Add media first"
         }
-        if hasProducedResults {
+        if appState.productionExecutionMode == .desk {
+            return viewModel.deskHandoffReady ? "Package ready" : "Ready to package"
+        }
+        if hasFieldResults {
             return "Ready to retry"
         }
         return appState.inferenceMode == .cloud ? "Cloud ready" : "On-device ready"
@@ -32,18 +39,60 @@ struct ContentProductionView: View {
         !viewModel.producedURLs.isEmpty || !viewModel.postBodyText.isEmpty
     }
 
+    private var hasFieldResults: Bool {
+        appState.productionExecutionMode == .field && hasProducedResults
+    }
+
+    private var hasDeskHandoffReady: Bool {
+        appState.productionExecutionMode == .desk && viewModel.deskHandoffReady
+    }
+
+    private var hasShareableResults: Bool {
+        hasFieldResults || hasDeskHandoffReady
+    }
+
+    private var hasIssue: Bool {
+        viewModel.latestError?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    private var resultsTitle: String {
+        hasIssue ? "Partial results" : "Results"
+    }
+
+    private var resultsDetail: String {
+        if hasIssue {
+            if !viewModel.producedURLs.isEmpty && viewModel.postBodyText.isEmpty {
+                return "Visual only"
+            }
+            if viewModel.producedURLs.isEmpty && !viewModel.postBodyText.isEmpty {
+                return "Text only"
+            }
+            return "Incomplete"
+        }
+        if hasDeskHandoffReady {
+            return "Originals ready"
+        }
+        return viewModel.producedURLs.isEmpty ? "Text only" : "Ready to export"
+    }
+
     private var canStartProduction: Bool {
         !viewModel.assets.isEmpty && !viewModel.isRunning && !cloudModeNeedsAPIKey
     }
 
     private var productionButtonTitle: String {
         if viewModel.isRunning {
-            return "Building the update..."
+            return appState.productionExecutionMode == .desk ? "Preparing package..." : "Building the update..."
         }
-        if hasProducedResults {
+        if hasIssue {
+            return appState.productionExecutionMode == .desk ? "Retry package" : "Retry production"
+        }
+        if hasShareableResults {
+            if appState.productionExecutionMode == .desk {
+                return "Rebuild package"
+            }
             return "Redo production"
         }
-        return "Produce visuals and post body"
+        return appState.productionExecutionMode == .desk ? "Package for desk" : "Produce visuals and post body"
     }
 
     var body: some View {
@@ -162,29 +211,40 @@ struct ContentProductionView: View {
                 OceanSectionHeader(title: "Production", detail: productionStatusDetail)
 
                 if cloudModeNeedsAPIKey {
-                    Text("Cloud inference is selected. Add your Google AI Studio API key in Settings before producing visuals and caption text.")
+                    Text("Cloud creation is selected. Add your API key in Settings before producing visuals and caption text.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if appState.productionExecutionMode == .desk {
+                    Text("Desk Mode keeps the story and original media unchanged so someone else can finish the post later.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(OceanPalette.ink.opacity(0.64))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Button {
-                    let retry = hasProducedResults
-                    Task {
+                    let retry = appState.productionExecutionMode == .field && hasProducedResults
+                    productionTask = Task {
                         await viewModel.run(
                             backgroundBriefing: appState.backgroundBriefing,
                             story: appState.story,
+                            executionMode: appState.productionExecutionMode,
                             inference: appState.inferenceConfiguration,
                             retry: retry
                         )
+                        productionTask = nil
                     }
                 } label: {
                     HStack(spacing: 10) {
                         if viewModel.isRunning {
                             ProgressView()
                                 .tint(.white)
-                        } else if hasProducedResults {
+                        } else if hasShareableResults {
                             Image(systemName: "arrow.clockwise")
+                        } else if appState.productionExecutionMode == .desk {
+                            Image(systemName: "shippingbox")
                         } else {
                             Image(systemName: "sparkles")
                         }
@@ -194,35 +254,18 @@ struct ContentProductionView: View {
                 }
                 .buttonStyle(OceanPrimaryButtonStyle())
                 .disabled(!canStartProduction)
-            }
 
-            if !viewModel.postBodyText.isEmpty {
-                OceanCard {
-                    OceanSectionHeader(title: "Post body")
-
-                    Text(viewModel.postBodyText)
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundStyle(OceanPalette.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if hasProducedResults {
-                OceanCard {
-                    OceanSectionHeader(
-                        title: "Results",
-                        detail: viewModel.producedURLs.isEmpty ? "Text only" : "Ready to export"
-                    )
-
-                    ViewThatFits {
-                        HStack(spacing: 12) {
-                            shareActions
-                        }
-
-                        VStack(spacing: 12) {
-                            shareActions
+                if viewModel.isRunning {
+                    Button {
+                        productionTask?.cancel()
+                        productionTask = nil
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "xmark.circle")
+                            Text("Cancel production")
                         }
                     }
+                    .buttonStyle(OceanSecondaryButtonStyle())
                 }
             }
 
@@ -239,6 +282,36 @@ struct ContentProductionView: View {
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(OceanPalette.ink)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            if appState.productionExecutionMode == .field && !viewModel.postBodyText.isEmpty {
+                OceanCard {
+                    OceanSectionHeader(title: "Post body")
+
+                    Text(viewModel.postBodyText)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if hasShareableResults {
+                OceanCard {
+                    OceanSectionHeader(
+                        title: resultsTitle,
+                        detail: resultsDetail
+                    )
+
+                    ViewThatFits {
+                        HStack(spacing: 12) {
+                            shareActions
+                        }
+
+                        VStack(spacing: 12) {
+                            shareActions
+                        }
                     }
                 }
             }
@@ -276,7 +349,7 @@ struct ContentProductionView: View {
 
     @ViewBuilder
     private var shareActions: some View {
-        Button(ProcessInfo.processInfo.isiOSAppOnMac ? "Export results" : "Share results") {
+        Button(shareButtonTitle) {
             if ProcessInfo.processInfo.isiOSAppOnMac {
                 viewModel.openExportDirectory()
             } else {
@@ -289,14 +362,26 @@ struct ContentProductionView: View {
             }
         }
         .buttonStyle(OceanSecondaryButtonStyle())
-        .disabled(viewModel.producedURLs.isEmpty && viewModel.postBodyText.isEmpty)
+        .disabled(!hasShareableResults)
 
-        Button(viewModel.postBodyText.isEmpty ? "No text yet" : "Copy text") {
-            if !viewModel.postBodyText.isEmpty {
-                viewModel.copyPostBodyToPasteboard()
+        if appState.productionExecutionMode == .field {
+            Button(viewModel.postBodyText.isEmpty ? "No text yet" : "Copy text") {
+                if !viewModel.postBodyText.isEmpty {
+                    viewModel.copyPostBodyToPasteboard()
+                }
             }
+            .buttonStyle(OceanSecondaryButtonStyle())
+            .disabled(viewModel.postBodyText.isEmpty)
         }
-        .buttonStyle(OceanSecondaryButtonStyle())
-        .disabled(viewModel.postBodyText.isEmpty)
+    }
+
+    private var shareButtonTitle: String {
+        if hasIssue {
+            return ProcessInfo.processInfo.isiOSAppOnMac ? "Export partial results" : "Share partial results"
+        }
+        if hasDeskHandoffReady {
+            return ProcessInfo.processInfo.isiOSAppOnMac ? "Export package" : "Share package"
+        }
+        return ProcessInfo.processInfo.isiOSAppOnMac ? "Export results" : "Share results"
     }
 }

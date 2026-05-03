@@ -10,12 +10,15 @@ Current focus:
 
 - persistent background briefing
 - content-production workflow with imported media assets
-- selectable on-device LiteRT-LM or hosted Gemini API inference
+- Field Mode for creating finished posts locally or in the cloud
+- Desk Mode for packaging raw media so a teammate can finish later
+- selectable on-device LiteRT-LM or hosted Gemini API processing
 - local Gemma 4 LiteRT model management for on-device runs
 - Gemini API key and hosted Gemma 4 model settings for cloud runs
 - on-device Apple-native media tool-calling orchestration
-- shareable YAML packages containing generated post body text and produced
-  visual outputs with pre-render provenance and GPS metadata
+- shareable packages containing raw story inputs, media manifests, pre-render
+  provenance, GPS metadata, and either generated Field Mode outputs or
+  unprocessed Desk Mode media
 
 Open the Xcode project:
 
@@ -35,6 +38,22 @@ Apple-specific support files live alongside the app:
   copies
 - `apps/apple/overlay-lab/`: segregated overlay experiments, local render
   checks, and simulator-driven Gemma overlay runs
+- Cloud production calls the Gemini API with field-mode deadlines for unstable
+  networks, visible stage labels, explicit timeout errors, and a cancel action
+  that unwinds the Production state. Cloud media is uploaded through the Gemini
+  Files API, reused across production turns as `fileData`, and deleted after
+  the run.
+
+## Collaborator Modes
+
+Field Mode generates here. It runs Gemma 4 on device through LiteRT-LM or in the
+cloud through the Gemini API, then exports `aileen-job.yaml` with
+`execution.mode: field_completed`, generated `story.post_body`, and finished
+media.
+
+Desk Mode generates later. It skips Gemma 4, exports `aileen-job.yaml` with
+`execution.mode: remote_generate`, keeps the user prompt in `story.raw`, omits
+generated post text, and copies selected media into `media/` unchanged.
 
 ## Checkout Bootstrap
 

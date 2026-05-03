@@ -9,9 +9,11 @@ actor GoogleAIStudioToolCallingEngine {
     )
 
     private let client: GoogleAIStudioClient
+    private let fileReferences: [String: GoogleAIStudioFileReference]
 
-    init(apiKey: String) {
+    init(apiKey: String, fileReferences: [String: GoogleAIStudioFileReference] = [:]) {
         client = GoogleAIStudioClient(apiKey: apiKey)
+        self.fileReferences = fileReferences
     }
 
     func run(
@@ -38,6 +40,17 @@ actor GoogleAIStudioToolCallingEngine {
         var finalText = ""
         var rawResponses: [String] = []
         var thoughtTraces: [String] = []
+        var activeFileReferences = fileReferences
+        if activeFileReferences.isEmpty {
+            activeFileReferences = try await uploadCloudFiles(sourceAssets)
+        }
+        defer {
+            if fileReferences.isEmpty {
+                Task {
+                    await self.deleteCloudFiles(activeFileReferences)
+                }
+            }
+        }
 
         let needsComposition = sourceAssets.count > 1
         let firstPrompt = needsComposition ? composeTurnPrompt(from: initialPrompt) : initialPrompt
@@ -45,7 +58,11 @@ actor GoogleAIStudioToolCallingEngine {
         let firstAllowedFunctions = needsComposition ? ["compose_visuals"] : ["add_text_overlay"]
         Self.logOutgoingTurn(label: "visual user turn 1", text: firstPrompt, assets: firstAssets)
         var contents: [[String: Any]] = [
-            try GoogleAIStudioMessageFactory.userMessage(text: firstPrompt, assets: firstAssets)
+            try GoogleAIStudioMessageFactory.userMessage(
+                text: firstPrompt,
+                assets: firstAssets,
+                fileReferences: activeFileReferences
+            )
         ]
 
         var response = try await client.sendGenerateContent(
@@ -158,6 +175,29 @@ actor GoogleAIStudioToolCallingEngine {
             return ["move_text_overlay", "accept_overlay_layout"]
         }
         return nil
+    }
+
+    private func uploadCloudFiles(_ assets: [ProductionAssetDescriptor]) async throws -> [String: GoogleAIStudioFileReference] {
+        var uploadedFiles: [String: GoogleAIStudioFileReference] = [:]
+        do {
+            for asset in assets {
+                try Task.checkCancellation()
+                guard let uploadFile = try PromptMediaEncoder.promptUploadFile(for: asset.mediaAsset) else {
+                    continue
+                }
+                uploadedFiles[asset.toolID] = try await client.uploadFile(uploadFile)
+            }
+            return uploadedFiles
+        } catch {
+            await deleteCloudFiles(uploadedFiles)
+            throw error
+        }
+    }
+
+    private func deleteCloudFiles(_ fileReferences: [String: GoogleAIStudioFileReference]) async {
+        for fileReference in fileReferences.values {
+            await client.deleteFile(fileReference)
+        }
     }
 
     private static func logOutgoingTurn(

@@ -1,5 +1,39 @@
 import Foundation
 
+enum ProductionExecutionMode: String, CaseIterable, Identifiable {
+    case field = "field"
+    case desk = "desk"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .field:
+            return "Field"
+        case .desk:
+            return "Desk"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .field:
+            return "Create now"
+        case .desk:
+            return "Finish later"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .field:
+            return "Create the finished post now, including media, text, and the share package."
+        case .desk:
+            return "Save the story and original media so a trusted teammate can finish it later."
+        }
+    }
+}
+
 enum InferenceMode: String, CaseIterable, Identifiable {
     case onDevice = "on_device"
     case cloud
@@ -9,7 +43,7 @@ enum InferenceMode: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .onDevice:
-            return "On-Device"
+            return "This Device"
         case .cloud:
             return "Cloud"
         }
@@ -25,9 +59,9 @@ enum ModelOption: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .e2bLiteRT:
-            return "Gemma 4 E2B"
+            return "Fast device model"
         case .e4bLiteRT:
-            return "Gemma 4 E4B"
+            return "Larger device model"
         }
     }
 
@@ -50,18 +84,18 @@ enum CloudModelOption: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .gemma426bA4B:
-            return "Gemma 4 26B A4B"
+            return "Balanced cloud model"
         case .gemma431B:
-            return "Gemma 4 31B"
+            return "Larger cloud model"
         }
     }
 
     var detail: String {
         switch self {
         case .gemma426bA4B:
-            return "Hosted Gemma 4 26B A4B via Google AI Studio and the Gemini API."
+            return "Good default for faster cloud creation."
         case .gemma431B:
-            return "Hosted Gemma 4 31B via Google AI Studio for higher-capacity cloud inference."
+            return "More capacity for harder posts, with longer waits."
         }
     }
 

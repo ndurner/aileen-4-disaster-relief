@@ -94,16 +94,24 @@ Current product areas in the app:
 - `Background briefing`
   Persistent large-form operational context entered by the user.
 - `Content production`
-  Media intake, output-format selection, Gemma-driven visual planning,
-  Apple-native overlay rendering, post-body generation, retry, export, and
-  sharing.
+  Media intake, output-format selection, Field Mode generation, Desk Mode
+  handoff packaging, retry, export, and sharing.
 - `Settings`
-  Inference mode, on-device model selection, hosted model selection, local model
-  import, and Gemini API key storage.
+  Collaborator mode, processing location, on-device model selection, hosted model
+  selection, local model import, and Gemini API key storage.
 
 ## Model Strategy
 
-The Apple app supports two inference modes.
+The Apple app supports two collaborator modes:
+
+- Field Mode: generate here. Run Gemma 4 through the selected inference backend
+  and produce overlay media, post body text, relay packet data, and a share
+  package.
+- Desk Mode: generate later. Do not call Gemma 4 from the app. Package the raw
+  story, background briefing, requested outputs, media manifest, and unprocessed
+  selected media for a trusted recipient.
+
+Field Mode supports two inference modes.
 
 On-device mode:
 
@@ -122,6 +130,11 @@ Cloud mode:
 - API key entry in Settings, stored through the app key store
 - API keys are Gemini API keys, which Google currently creates and manages
   through Google AI Studio or Google Cloud project credentials
+- image inputs are uploaded through the Gemini Files API and referenced from
+  `generateContent` as `fileData`; the app deletes uploaded files after each
+  production run and relies on Gemini's temporary file retention as a fallback
+- hosted calls use a field-mode request deadline, show the active production
+  stage, and include attempt counts and timeout reasons in Production errors
 - this is not Vertex AI and does not use OpenRouter-specific routing controls
 
 Pinned LiteRT-LM download URLs for local testing:
@@ -154,8 +167,9 @@ frameworks. Images target a `1080 x 1350` canvas and reels target a
 Exports are written into the app's Documents area as an Aileen YAML package:
 
 - `aileen-job.yaml` with `aileen_job_version: 1`, `execution.mode:
-  field_completed`, generated post body text, and media entries
-- `media/` containing the produced visual outputs, including rendered overlays
+  field_completed` for Field Mode or `remote_generate` for Desk Mode
+- `media/` containing produced visual outputs in Field Mode, including rendered
+  overlays, or unprocessed selected media in Desk Mode
 
 Media `source_type` records the best pre-render provenance signal for the
 produced media. This is intentionally stored in YAML because adding overlays can
@@ -168,6 +182,31 @@ digital source type markers for generative AI promote the produced item to
 coordinate, that coordinate is also carried into the YAML media entry. A bare
 C2PA manifest is not treated as synthetic because authenticity cameras can also
 write C2PA credentials.
+
+Current `aileen-job.yaml` schema:
+
+```yaml
+aileen_job_version: 1
+execution:
+  mode: field_completed # or remote_generate
+story:
+  raw: |-
+    Original user story prompt.
+  post_body: |-
+    Generated Field Mode caption. Omitted in Desk Mode.
+media:
+  - id: media_001
+    filename: "media/media_001.jpg"
+    type: photo # or video
+    source_type: field_photo # field_photo, synthetic_demo_image, or unknown
+    gps:
+      latitude: -33.868800
+      longitude: 151.209300
+```
+
+Desk Mode packages are declarative job cards. They carry raw inputs, but
+intentionally omit generated post text and overlay-rendered media until a later
+Decoder workflow creates the finished post.
 
 Overlay placement remains active product work. The app now performs pre-analysis
 for protected regions and layout guidance, but prompt and tool-contract quality
