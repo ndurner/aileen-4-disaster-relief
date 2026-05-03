@@ -14,7 +14,8 @@ Current focus:
 - local Gemma 4 LiteRT model management for on-device runs
 - Gemini API key and hosted Gemma 4 model settings for cloud runs
 - on-device Apple-native media tool-calling orchestration
-- shareable visual and text outputs
+- shareable YAML packages containing generated post body text and produced
+  visual outputs with pre-render provenance and GPS metadata
 
 Open the Xcode project:
 

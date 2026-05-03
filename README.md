@@ -148,9 +148,26 @@ The production workflow exposes a small media-tool contract to Gemma:
 - `accept_overlay_layout`
 
 The tool executor is implemented in Swift and renders locally with Apple
-frameworks. Images target a `1080 x 1350` canvas, reels target a `1080 x 1920`
-canvas, and exported results are written into the app's Documents area for
-sharing.
+frameworks. Images target a `1080 x 1350` canvas and reels target a
+`1080 x 1920` canvas.
+
+Exports are written into the app's Documents area as an Aileen YAML package:
+
+- `aileen-job.yaml` with `aileen_job_version: 1`, `execution.mode:
+  field_completed`, generated post body text, and media entries
+- `media/` containing the produced visual outputs, including rendered overlays
+
+Media `source_type` records the best pre-render provenance signal for the
+produced media. This is intentionally stored in YAML because adding overlays can
+invalidate embedded C2PA manifests, and downstream messaging or social apps may
+strip image metadata entirely. Photo-library image selections with
+camera-capture metadata are marked `field_photo`, file imports and photo-library
+items without camera metadata are marked `unknown`, and embedded C2PA/IPTC
+digital source type markers for generative AI promote the produced item to
+`synthetic_demo_image`. When the selected source media has one unambiguous GPS
+coordinate, that coordinate is also carried into the YAML media entry. A bare
+C2PA manifest is not treated as synthetic because authenticity cameras can also
+write C2PA credentials.
 
 Overlay placement remains active product work. The app now performs pre-analysis
 for protected regions and layout guidance, but prompt and tool-contract quality

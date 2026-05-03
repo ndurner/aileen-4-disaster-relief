@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import ImageIO
 import OSLog
@@ -53,7 +54,11 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private var nextImportedFileNumber = 1
     private var usedRetrySamplerSeeds: Set<Int32> = []
 
-    func appendImportedFile(_ sourceURL: URL, displayName overrideDisplayName: String? = nil) throws {
+    func appendImportedFile(
+        _ sourceURL: URL,
+        displayName overrideDisplayName: String? = nil,
+        importSource: MediaAsset.ImportSource = .importedFile
+    ) throws {
         let targetDirectory = try assetStorageDirectory()
         try FileManager.default.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
         let targetURL = targetDirectory.appendingPathComponent("\(UUID().uuidString)-\(sourceURL.lastPathComponent)")
@@ -66,7 +71,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
             kind: MediaAsset.kind(for: sourceURL),
             originalURL: sourceURL,
             localCopyURL: targetURL,
-            displayName: overrideDisplayName ?? sourceURL.lastPathComponent
+            displayName: overrideDisplayName ?? sourceURL.lastPathComponent,
+            importSource: importSource
         ))
     }
 
@@ -91,7 +97,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
                     let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(suggestedName).\(ext)")
                     try data.write(to: tempURL, options: .atomic)
                     let displayName = cameraRollDisplayName(for: tempURL)
-                    try appendImportedFile(tempURL, displayName: displayName)
+                    try appendImportedFile(tempURL, displayName: displayName, importSource: .photoLibrary)
                 }
             } catch {
                 latestError = error.localizedDescription
@@ -152,21 +158,129 @@ final class ProductionWorkflowViewModel: ObservableObject {
         let directory = root.appendingPathComponent("Share-\(timestamp)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        for sourceURL in producedURLs {
-            let destinationURL = directory.appendingPathComponent(sourceURL.lastPathComponent, isDirectory: false)
+        let mediaDirectory = directory.appendingPathComponent("media", isDirectory: true)
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+
+        let packageMedia = try copyPackageMediaAssets(to: mediaDirectory)
+        let packageURL = directory.appendingPathComponent("aileen-job.yaml", isDirectory: false)
+        let packageYAML = makePackageYAML(media: packageMedia)
+        try packageYAML.write(to: packageURL, atomically: true, encoding: .utf8)
+
+        exportDirectoryURL = directory
+        shareItems = ([packageURL] + packageMedia.map(\.url)).map { $0 as Any }
+        return directory
+    }
+
+    func prepareSharePackage() throws {
+        _ = try prepareExportDirectory()
+    }
+
+    private func copyPackageMediaAssets(to mediaDirectory: URL) throws -> [AileenPackageMediaItem] {
+        try producedURLs.enumerated().map { offset, sourceURL in
+            let filename = packageMediaFilename(for: sourceURL, index: offset)
+            let destinationURL = mediaDirectory.appendingPathComponent(filename, isDirectory: false)
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 try FileManager.default.removeItem(at: destinationURL)
             }
             try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            return AileenPackageMediaItem(
+                id: "media_\(String(format: "%03d", offset + 1))",
+                filename: "media/\(filename)",
+                type: packageMediaType(for: sourceURL),
+                sourceType: packageSourceTypeForProducedMedia(),
+                gpsCoordinate: sourceGPSCoordinateForProducedMedia(),
+                url: destinationURL
+            )
+        }
+    }
+
+    private func packageMediaFilename(for sourceURL: URL, index: Int) -> String {
+        let fallbackExtension = outputKind == .reel ? "mp4" : "jpg"
+        let originalExtension = sourceURL.pathExtension
+        let fileExtension = originalExtension.isEmpty ? fallbackExtension : originalExtension.lowercased()
+        return "media_\(String(format: "%03d", index + 1)).\(fileExtension)"
+    }
+
+    private func packageMediaType(for sourceURL: URL) -> String {
+        MediaAsset.kind(for: sourceURL) == .movie ? "video" : "photo"
+    }
+
+    private func packageSourceTypeForProducedMedia() -> String {
+        guard !assets.isEmpty else {
+            return "unknown"
         }
 
-        if !postBodyText.isEmpty {
-            let postBodyURL = directory.appendingPathComponent("post-body.txt", isDirectory: false)
-            try postBodyText.write(to: postBodyURL, atomically: true, encoding: .utf8)
+        // Rendering overlays can invalidate C2PA and other embedded metadata.
+        // Preserve the strongest pre-render provenance signal in the YAML.
+        let sourceTypes = assets.map(packageSourceType(for:))
+        if sourceTypes.contains("synthetic_demo_image") {
+            return "synthetic_demo_image"
+        }
+        if sourceTypes.allSatisfy({ $0 == "field_photo" }) {
+            return "field_photo"
+        }
+        return "unknown"
+    }
+
+    private func sourceGPSCoordinateForProducedMedia() -> AileenGPSCoordinate? {
+        let coordinates = assets.compactMap { GPSMetadataReader.coordinate(for: $0) }
+        guard let first = coordinates.first else {
+            return nil
+        }
+        guard coordinates.allSatisfy({ $0.isSameLocation(as: first) }) else {
+            return nil
+        }
+        return first
+    }
+
+    private func packageSourceType(for asset: MediaAsset) -> String {
+        if C2PASyntheticSourceDetector.isSyntheticDemoImage(at: asset.localCopyURL) {
+            return "synthetic_demo_image"
         }
 
-        exportDirectoryURL = directory
-        return directory
+        switch asset.importSource {
+        case .photoLibrary:
+            return asset.kind == .image && PhotoCaptureMetadataDetector.hasCameraCaptureMetadata(at: asset.localCopyURL)
+                ? "field_photo"
+                : "unknown"
+        case .importedFile:
+            return "unknown"
+        }
+    }
+
+    private func makePackageYAML(media: [AileenPackageMediaItem]) -> String {
+        var lines: [String] = [
+            "aileen_job_version: 1",
+            "",
+            "execution:",
+            "  mode: field_completed"
+        ]
+
+        let postBody = postBodyText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !postBody.isEmpty {
+            lines.append("")
+            lines.append("story:")
+            lines.append("  post_body: |-")
+            lines.append(contentsOf: yamlBlockLines(postBody, indentation: "    "))
+        }
+
+        if !media.isEmpty {
+            lines.append("")
+            lines.append("media:")
+            for item in media {
+                lines.append("  - id: \(item.id)")
+                lines.append("    filename: \(yamlScalar(item.filename))")
+                lines.append("    type: \(item.type)")
+                lines.append("    source_type: \(item.sourceType)")
+                if let gpsCoordinate = item.gpsCoordinate {
+                    lines.append("    gps:")
+                    lines.append("      latitude: \(yamlDecimal(gpsCoordinate.latitude))")
+                    lines.append("      longitude: \(yamlDecimal(gpsCoordinate.longitude))")
+                }
+            }
+        }
+
+        return lines.joined(separator: "\n") + "\n"
     }
 
     func openExportDirectory() {
@@ -782,6 +896,157 @@ enum ProductionPrompts {
         Default to no hashtags; include at most 3 only when they are clearly useful and clearly supported.
         """
     }
+}
+
+private struct AileenPackageMediaItem {
+    let id: String
+    let filename: String
+    let type: String
+    let sourceType: String
+    let gpsCoordinate: AileenGPSCoordinate?
+    let url: URL
+}
+
+private struct AileenGPSCoordinate {
+    let latitude: Double
+    let longitude: Double
+
+    func isSameLocation(as other: AileenGPSCoordinate) -> Bool {
+        abs(latitude - other.latitude) < 0.000001
+            && abs(longitude - other.longitude) < 0.000001
+    }
+}
+
+private enum GPSMetadataReader {
+    static func coordinate(for asset: MediaAsset) -> AileenGPSCoordinate? {
+        switch asset.kind {
+        case .image:
+            return imageCoordinate(at: asset.localCopyURL)
+        case .movie:
+            return movieCoordinate(at: asset.localCopyURL)
+        }
+    }
+
+    private static func imageCoordinate(at url: URL) -> AileenGPSCoordinate? {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any],
+              let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any],
+              let latitude = gpsNumber(gps[kCGImagePropertyGPSLatitude]),
+              let longitude = gpsNumber(gps[kCGImagePropertyGPSLongitude]) else {
+            return nil
+        }
+
+        let latitudeRef = gps[kCGImagePropertyGPSLatitudeRef] as? String
+        let longitudeRef = gps[kCGImagePropertyGPSLongitudeRef] as? String
+        return AileenGPSCoordinate(
+            latitude: signedCoordinate(latitude, ref: latitudeRef, negativeRef: "S"),
+            longitude: signedCoordinate(longitude, ref: longitudeRef, negativeRef: "W")
+        )
+    }
+
+    private static func movieCoordinate(at url: URL) -> AileenGPSCoordinate? {
+        let asset = AVURLAsset(url: url)
+        let metadata = asset.metadata(forFormat: .quickTimeMetadata)
+        let location = metadata.first {
+            $0.identifier == .quickTimeMetadataLocationISO6709
+        }?.stringValue
+        return location.flatMap(coordinateFromISO6709)
+    }
+
+    private static func gpsNumber(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber {
+            return number.doubleValue
+        }
+        if let string = value as? String {
+            return Double(string)
+        }
+        return nil
+    }
+
+    private static func signedCoordinate(_ value: Double, ref: String?, negativeRef: String) -> Double {
+        ref?.uppercased() == negativeRef ? -abs(value) : abs(value)
+    }
+
+    private static func coordinateFromISO6709(_ value: String) -> AileenGPSCoordinate? {
+        let pattern = #"^([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)"#
+        guard let match = value.range(of: pattern, options: .regularExpression) else {
+            return nil
+        }
+
+        let matched = String(value[match])
+        let longitudeStart = matched.dropFirst().firstIndex { $0 == "+" || $0 == "-" }
+        guard let longitudeStart,
+              let latitude = Double(matched[..<longitudeStart]),
+              let longitude = Double(matched[longitudeStart...]) else {
+            return nil
+        }
+        return AileenGPSCoordinate(latitude: latitude, longitude: longitude)
+    }
+}
+
+private enum C2PASyntheticSourceDetector {
+    private static let syntheticSourceMarkers = [
+        "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
+        "http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia",
+        "http://cv.iptc.org/newscodes/digitalsourcetype/compositeSynthetic",
+        "digsrctype:trainedAlgorithmicMedia",
+        "digsrctype:compositeWithTrainedAlgorithmicMedia",
+        "digsrctype:compositeSynthetic",
+        "trainedAlgorithmicMedia",
+        "compositeWithTrainedAlgorithmicMedia",
+        "compositeSynthetic"
+    ]
+
+    static func isSyntheticDemoImage(at url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else {
+            return false
+        }
+
+        // C2PA also appears on authenticity-camera captures; only explicit
+        // generative-AI source claims make this a synthetic demo asset.
+        return syntheticSourceMarkers.contains { marker in
+            guard let markerData = marker.data(using: .utf8) else { return false }
+            return data.range(of: markerData) != nil
+        }
+    }
+}
+
+private enum PhotoCaptureMetadataDetector {
+    static func hasCameraCaptureMetadata(at url: URL) -> Bool {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] else {
+            return false
+        }
+
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        return hasNonEmptyString(tiff?[kCGImagePropertyTIFFMake])
+            || hasNonEmptyString(tiff?[kCGImagePropertyTIFFModel])
+            || hasNonEmptyString(exif?[kCGImagePropertyExifLensModel])
+            || hasNonEmptyString(exif?[kCGImagePropertyExifDateTimeOriginal])
+    }
+
+    private static func hasNonEmptyString(_ value: Any?) -> Bool {
+        guard let string = value as? String else { return false }
+        return !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+private func yamlBlockLines(_ text: String, indentation: String) -> [String] {
+    text.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+        "\(indentation)\(line)"
+    }
+}
+
+private func yamlScalar(_ text: String) -> String {
+    let escaped = text
+        .replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "\"", with: "\\\"")
+    return "\"\(escaped)\""
+}
+
+private func yamlDecimal(_ value: Double) -> String {
+    String(format: "%.6f", locale: Locale(identifier: "en_US_POSIX"), value)
 }
 
 enum PostBodyToolSchema {

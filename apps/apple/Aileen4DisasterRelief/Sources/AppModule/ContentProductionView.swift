@@ -259,7 +259,11 @@ struct ContentProductionView: View {
                     defer {
                         if accessing { url.stopAccessingSecurityScopedResource() }
                     }
-                    try viewModel.appendImportedFile(url, displayName: viewModel.importedFileDisplayName(for: url))
+                    try viewModel.appendImportedFile(
+                        url,
+                        displayName: viewModel.importedFileDisplayName(for: url),
+                        importSource: .importedFile
+                    )
                 }
             } catch {
                 viewModel.latestError = error.localizedDescription
@@ -276,7 +280,12 @@ struct ContentProductionView: View {
             if ProcessInfo.processInfo.isiOSAppOnMac {
                 viewModel.openExportDirectory()
             } else {
-                shareSheetPresented = true
+                do {
+                    try viewModel.prepareSharePackage()
+                    shareSheetPresented = true
+                } catch {
+                    viewModel.latestError = error.localizedDescription
+                }
             }
         }
         .buttonStyle(OceanSecondaryButtonStyle())
