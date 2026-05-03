@@ -101,6 +101,11 @@ final class ProductionWorkflowViewModel: ObservableObject {
     }
 
     func run(backgroundBriefing: String, story: String, inference: InferenceConfiguration, retry: Bool = false) async {
+        guard !assets.isEmpty else {
+            latestError = "Add at least one media asset before producing visuals."
+            return
+        }
+
         isRunning = true
         latestError = nil
         postBodyText = ""

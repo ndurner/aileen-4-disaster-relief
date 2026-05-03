@@ -19,6 +19,9 @@ struct ContentProductionView: View {
         if cloudModeNeedsAPIKey {
             return "Google AI Studio key required"
         }
+        if viewModel.assets.isEmpty {
+            return "Add media first"
+        }
         if hasProducedResults {
             return "Ready to retry"
         }
@@ -27,6 +30,10 @@ struct ContentProductionView: View {
 
     private var hasProducedResults: Bool {
         !viewModel.producedURLs.isEmpty || !viewModel.postBodyText.isEmpty
+    }
+
+    private var canStartProduction: Bool {
+        !viewModel.assets.isEmpty && !viewModel.isRunning && !cloudModeNeedsAPIKey
     }
 
     private var productionButtonTitle: String {
@@ -186,7 +193,7 @@ struct ContentProductionView: View {
                     }
                 }
                 .buttonStyle(OceanPrimaryButtonStyle())
-                .disabled(viewModel.isRunning || cloudModeNeedsAPIKey)
+                .disabled(!canStartProduction)
             }
 
             if !viewModel.postBodyText.isEmpty {
