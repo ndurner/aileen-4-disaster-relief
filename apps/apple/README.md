@@ -54,6 +54,11 @@ media.
 Desk Mode generates later. It skips Gemma 4, exports `aileen-job.yaml` with
 `execution.mode: remote_generate`, keeps the user prompt in `story.raw`, omits
 generated post text, and copies selected media into `media/` unchanged.
+The app keeps location, update time, and safety notes behind an optional details
+section. Time can use image metadata by default, while location defaults to
+omitted and can be switched to image-derived or manual when useful. Export
+copies the YAML package text to the clipboard and shares media files separately
+on iOS, which is intended for messenger handoff workflows.
 
 ## Checkout Bootstrap
 

@@ -9,6 +9,35 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class ProductionWorkflowViewModel: ObservableObject {
+    struct FieldUpdateDetails {
+        enum MetadataFieldMode: String, CaseIterable, Identifiable {
+            case fromMedia
+            case omit
+            case manual
+
+            var id: String { rawValue }
+
+            var displayName: String {
+                switch self {
+                case .fromMedia:
+                    return "Images"
+                case .omit:
+                    return "Omit"
+                case .manual:
+                    return "Manual"
+                }
+            }
+        }
+
+        var locationMode: MetadataFieldMode = .omit
+        var updateTimeMode: MetadataFieldMode = .fromMedia
+        var manualLocationLabel = ""
+        var manualUpdateTimeLocal = ""
+        var safetyWarning = Self.defaultSafetyWarning
+
+        static let defaultSafetyWarning = "Keep public location broad; avoid exact rescue, private, supply, route, and responder staging locations."
+    }
+
     private struct ProductionOverlayPreparation {
         let promptAddendum: String?
         let protectedRegions: OverlayProtectedRegions
@@ -39,6 +68,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
     @Published var latestError: String?
     @Published var currentStatusDetail: String?
     @Published var deskHandoffReady = false
+    @Published var fieldUpdateDetails = FieldUpdateDetails()
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "Aileen4DisasterRelief",
@@ -49,6 +79,17 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private static let productionPreAnalysisThinkingEnabled = true
     private static let productionGuideProvider: OverlayLayoutGuideProvider = .gemmaVision
     private static let productionGuidanceMode: OverlayLayoutGuidanceMode = .band
+    private static let packageDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+        return formatter
+    }()
+    private static let displayDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     private let locator = ModelLocator()
     private let postBodyRunner = GemmaTextRunner()
@@ -78,12 +119,14 @@ final class ProductionWorkflowViewModel: ObservableObject {
             displayName: overrideDisplayName ?? sourceURL.lastPathComponent,
             importSource: importSource
         ))
+        updateFieldDetailsFromMediaIfNeeded()
         deskHandoffReady = false
     }
 
     func removeAsset(_ asset: MediaAsset) {
         guard let index = assets.firstIndex(where: { $0.id == asset.id }) else { return }
         let removedAsset = assets.remove(at: index)
+        updateFieldDetailsFromMediaIfNeeded()
         deskHandoffReady = false
 
         guard FileManager.default.fileExists(atPath: removedAsset.localCopyURL.path) else { return }
@@ -210,7 +253,10 @@ final class ProductionWorkflowViewModel: ObservableObject {
         try packageYAML.write(to: packageURL, atomically: true, encoding: .utf8)
 
         exportDirectoryURL = directory
-        shareItems = ([packageURL] + packageMedia.map(\.url)).map { $0 as Any }
+        UIPasteboard.general.string = packageYAML
+        shareItems = packageMedia.isEmpty
+            ? [packageURL as Any]
+            : packageMedia.map { $0.url as Any }
         return directory
     }
 
@@ -233,7 +279,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
                     filename: "media/\(filename)",
                     type: packageMediaType(for: sourceURL),
                     sourceType: packageSourceTypeForProducedMedia(),
-                    gpsCoordinate: sourceGPSCoordinateForProducedMedia(),
+                    capturedAt: packageIncludesMediaCaptureTime ? sourceCapturedAtForProducedMedia() : nil,
+                    gpsCoordinate: packageIncludesMediaLocation ? sourceGPSCoordinateForProducedMedia() : nil,
                     url: destinationURL
                 )
             }
@@ -250,11 +297,20 @@ final class ProductionWorkflowViewModel: ObservableObject {
                     filename: "media/\(filename)",
                     type: asset.kind == .movie ? "video" : "photo",
                     sourceType: packageSourceType(for: asset),
-                    gpsCoordinate: GPSMetadataReader.coordinate(for: asset),
+                    capturedAt: packageIncludesMediaCaptureTime ? MediaMetadataReader.capturedAt(for: asset) : nil,
+                    gpsCoordinate: packageIncludesMediaLocation ? GPSMetadataReader.coordinate(for: asset) : nil,
                     url: destinationURL
                 )
             }
         }
+    }
+
+    private var packageIncludesMediaLocation: Bool {
+        fieldUpdateDetails.locationMode == .fromMedia
+    }
+
+    private var packageIncludesMediaCaptureTime: Bool {
+        fieldUpdateDetails.updateTimeMode == .fromMedia
     }
 
     private func packageMediaFilename(for sourceURL: URL, index: Int) -> String {
@@ -296,6 +352,11 @@ final class ProductionWorkflowViewModel: ObservableObject {
         return first
     }
 
+    private func sourceCapturedAtForProducedMedia() -> Date? {
+        let dates = assets.compactMap { MediaMetadataReader.capturedAt(for: $0) }.sorted()
+        return dates.first
+    }
+
     private func packageSourceType(for asset: MediaAsset) -> String {
         if C2PASyntheticSourceDetector.isSyntheticDemoImage(at: asset.localCopyURL) {
             return "synthetic_demo_image"
@@ -334,6 +395,24 @@ final class ProductionWorkflowViewModel: ObservableObject {
             }
         }
 
+        let locationLabel = packageLocationLabel()
+        let updateTimeLocal = packageUpdateTimeLocal()
+        let safetyWarning = fieldUpdateDetails.safetyWarning.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !locationLabel.isEmpty || !updateTimeLocal.isEmpty || !safetyWarning.isEmpty {
+            lines.append("")
+            lines.append("field_update:")
+            if !locationLabel.isEmpty {
+                lines.append("  location_label: \(yamlScalar(locationLabel))")
+            }
+            if !updateTimeLocal.isEmpty {
+                lines.append("  update_time_local: \(yamlScalar(updateTimeLocal))")
+            }
+            if !safetyWarning.isEmpty {
+                lines.append("  safety_warning: |-")
+                lines.append(contentsOf: yamlBlockLines(safetyWarning, indentation: "    "))
+            }
+        }
+
         if !media.isEmpty {
             lines.append("")
             lines.append("media:")
@@ -342,6 +421,9 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 lines.append("    filename: \(yamlScalar(item.filename))")
                 lines.append("    type: \(item.type)")
                 lines.append("    source_type: \(item.sourceType)")
+                if let capturedAt = item.capturedAt {
+                    lines.append("    captured_at: \(yamlScalar(Self.packageDateFormatter.string(from: capturedAt)))")
+                }
                 if let gpsCoordinate = item.gpsCoordinate {
                     lines.append("    gps:")
                     lines.append("      latitude: \(yamlDecimal(gpsCoordinate.latitude))")
@@ -371,6 +453,79 @@ final class ProductionWorkflowViewModel: ObservableObject {
         assets.enumerated().map { offset, asset in
             ProductionAssetDescriptor(toolID: "asset_\(offset + 1)", mediaAsset: asset)
         }
+    }
+
+    private func updateFieldDetailsFromMediaIfNeeded() {
+        if fieldUpdateDetails.safetyWarning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fieldUpdateDetails.safetyWarning = FieldUpdateDetails.defaultSafetyWarning
+        }
+    }
+
+    var locationMetadataSummary: String {
+        switch fieldUpdateDetails.locationMode {
+        case .fromMedia:
+            if let coordinate = sourceGPSCoordinateForProducedMedia() {
+                return "Will include image location as \(Self.generalizedLocationLabel(for: coordinate)) with coordinates. Use only when that is safe to share."
+            }
+            return "No image location found. Nothing will be added unless you choose Manual."
+        case .omit:
+            return "No location will be included in the package."
+        case .manual:
+            let label = fieldUpdateDetails.manualLocationLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return label.isEmpty ? "Add a broad public label if it helps the recipient." : "Will include: \(label). Image coordinates stay out."
+        }
+    }
+
+    var updateTimeMetadataSummary: String {
+        switch fieldUpdateDetails.updateTimeMode {
+        case .fromMedia:
+            if let capturedAt = sourceCapturedAtForProducedMedia() {
+                return "Will use image time: \(Self.displayDateFormatter.string(from: capturedAt))."
+            }
+            return "No image time found. Nothing will be added unless you choose Manual."
+        case .omit:
+            return "No update time will be included in the package."
+        case .manual:
+            let updateTime = fieldUpdateDetails.manualUpdateTimeLocal.trimmingCharacters(in: .whitespacesAndNewlines)
+            return updateTime.isEmpty ? "Add a simple local time if it helps the recipient." : "Will include: \(updateTime)"
+        }
+    }
+
+    private func packageLocationLabel() -> String {
+        switch fieldUpdateDetails.locationMode {
+        case .fromMedia:
+            return sourceGPSCoordinateForProducedMedia()
+                .map(Self.generalizedLocationLabel(for:)) ?? ""
+        case .omit:
+            return ""
+        case .manual:
+            return fieldUpdateDetails.manualLocationLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private func packageUpdateTimeLocal() -> String {
+        switch fieldUpdateDetails.updateTimeMode {
+        case .fromMedia:
+            return sourceCapturedAtForProducedMedia()
+                .map(Self.displayDateFormatter.string(from:)) ?? ""
+        case .omit:
+            return ""
+        case .manual:
+            return fieldUpdateDetails.manualUpdateTimeLocal.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private static func generalizedLocationLabel(for coordinate: AileenGPSCoordinate) -> String {
+        let latitudeHemisphere = coordinate.latitude < 0 ? "S" : "N"
+        let longitudeHemisphere = coordinate.longitude < 0 ? "W" : "E"
+        return String(
+            format: "Near %.2f° %@, %.2f° %@",
+            locale: Locale(identifier: "en_US_POSIX"),
+            abs(coordinate.latitude),
+            latitudeHemisphere,
+            abs(coordinate.longitude),
+            longitudeHemisphere
+        )
     }
 
     private func makeProductionPrompt(
@@ -1033,6 +1188,7 @@ private struct AileenPackageMediaItem {
     let filename: String
     let type: String
     let sourceType: String
+    let capturedAt: Date?
     let gpsCoordinate: AileenGPSCoordinate?
     let url: URL
 }
@@ -1044,6 +1200,55 @@ private struct AileenGPSCoordinate {
     func isSameLocation(as other: AileenGPSCoordinate) -> Bool {
         abs(latitude - other.latitude) < 0.000001
             && abs(longitude - other.longitude) < 0.000001
+    }
+}
+
+private enum MediaMetadataReader {
+    static func capturedAt(for asset: MediaAsset) -> Date? {
+        switch asset.kind {
+        case .image:
+            return imageCapturedAt(url: asset.localCopyURL)
+        case .movie:
+            return movieCapturedAt(url: asset.localCopyURL)
+        }
+    }
+
+    private static func imageCapturedAt(url: URL) -> Date? {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] else {
+            return fileModificationDate(url)
+        }
+
+        let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        let rawDate = exif?[kCGImagePropertyExifDateTimeOriginal] as? String
+            ?? exif?[kCGImagePropertyExifDateTimeDigitized] as? String
+            ?? tiff?[kCGImagePropertyTIFFDateTime] as? String
+        return rawDate.flatMap(parseImageDate) ?? fileModificationDate(url)
+    }
+
+    private static func movieCapturedAt(url: URL) -> Date? {
+        let asset = AVURLAsset(url: url)
+        let metadata = asset.metadata(forFormat: .quickTimeMetadata) + asset.commonMetadata
+        let rawDate = metadata.first {
+            $0.identifier == .quickTimeMetadataCreationDate || $0.commonKey == .commonKeyCreationDate
+        }?.stringValue
+        return rawDate.flatMap(parseISODate) ?? fileModificationDate(url)
+    }
+
+    private static func parseImageDate(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return formatter.date(from: value)
+    }
+
+    private static func parseISODate(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
+
+    private static func fileModificationDate(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date
     }
 }
 

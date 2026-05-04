@@ -194,11 +194,18 @@ story:
     Original user story prompt.
   post_body: |-
     Generated Field Mode caption. Omitted in Desk Mode.
+field_update:
+  location_label: "Ningaloo coast"
+  update_time_local: "Apr 4, 2026 at 3:30 PM"
+  safety_warning: |-
+    Keep public location broad; avoid exact rescue, private, supply, route,
+    and responder staging locations.
 media:
   - id: media_001
     filename: "media/media_001.jpg"
     type: photo # or video
     source_type: field_photo # field_photo, synthetic_demo_image, or unknown
+    captured_at: "2026-04-04T07:30:00Z"
     gps:
       latitude: -33.868800
       longitude: 151.209300
@@ -207,6 +214,15 @@ media:
 Desk Mode packages are declarative job cards. They carry raw inputs, but
 intentionally omit generated post text and overlay-rendered media until a later
 Decoder workflow creates the finished post.
+
+Location and time are controlled from the app's optional details section. Update
+time defaults to image metadata when available. Location defaults to omitted;
+choosing image-derived location includes media GPS coordinates, while a manual
+location label does not include coordinates.
+
+When a package is exported from the app, `aileen-job.yaml` is also copied to the
+clipboard. On iOS the share sheet receives the media files, so a responder can
+choose a messenger app and paste the package text into the message body.
 
 Overlay placement remains active product work. The app now performs pre-analysis
 for protected regions and layout guidance, but prompt and tool-contract quality

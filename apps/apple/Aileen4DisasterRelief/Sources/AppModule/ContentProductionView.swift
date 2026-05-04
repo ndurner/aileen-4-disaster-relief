@@ -8,6 +8,7 @@ struct ContentProductionView: View {
     @State private var fileImporterPresented = false
     @State private var shareSheetPresented = false
     @State private var productionTask: Task<Void, Never>?
+    @State private var updateDetailsExpanded = false
 
     private var cloudModeNeedsAPIKey: Bool {
         appState.productionExecutionMode == .field && appState.inferenceMode == .cloud && !appState.hasGoogleAIStudioAPIKey
@@ -79,6 +80,10 @@ struct ContentProductionView: View {
         !viewModel.assets.isEmpty && !viewModel.isRunning && !cloudModeNeedsAPIKey
     }
 
+    private var selectedMediaIncludesVideo: Bool {
+        viewModel.assets.contains { $0.kind == .movie }
+    }
+
     private var productionButtonTitle: String {
         if viewModel.isRunning {
             return appState.productionExecutionMode == .desk ? "Preparing package..." : "Building the update..."
@@ -122,6 +127,8 @@ struct ContentProductionView: View {
                         minHeight: 170
                     )
                 }
+
+                updateDetailsSection
 
                 VStack(spacing: 12) {
                     PhotosPicker(
@@ -221,6 +228,13 @@ struct ContentProductionView: View {
                     Text("Desk Mode keeps the story and original media unchanged so someone else can finish the post later.")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if appState.productionExecutionMode == .desk && selectedMediaIncludesVideo {
+                    Text("Video needs broadband handoff. For satellite messenger sharing, use still photos and the copied package text.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.coral)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -344,6 +358,112 @@ struct ContentProductionView: View {
         }
         .sheet(isPresented: $shareSheetPresented) {
             ShareSheet(items: viewModel.shareItems)
+        }
+    }
+
+    private var updateDetailsSection: some View {
+        DisclosureGroup(isExpanded: $updateDetailsExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                metadataModeControl(
+                    title: "Location",
+                    selection: $viewModel.fieldUpdateDetails.locationMode,
+                    summary: viewModel.locationMetadataSummary
+                )
+
+                if viewModel.fieldUpdateDetails.locationMode == .manual {
+                    detailField(
+                        title: "Public location label",
+                        placeholder: "A broad region, town, coast, or response area",
+                        text: $viewModel.fieldUpdateDetails.manualLocationLabel
+                    )
+                }
+
+                metadataModeControl(
+                    title: "Update time",
+                    selection: $viewModel.fieldUpdateDetails.updateTimeMode,
+                    summary: viewModel.updateTimeMetadataSummary
+                )
+
+                if viewModel.fieldUpdateDetails.updateTimeMode == .manual {
+                    detailField(
+                        title: "Local update time",
+                        placeholder: "Today afternoon, 4 Apr 2026 15:30, or similar",
+                        text: $viewModel.fieldUpdateDetails.manualUpdateTimeLocal
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Safety note")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink)
+
+                    OceanTextEditor(
+                        text: $viewModel.fieldUpdateDetails.safetyWarning,
+                        placeholder: "Anything that should limit what gets published.",
+                        minHeight: 112
+                    )
+                }
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "location.magnifyingglass")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(OceanPalette.deepWater)
+
+                Text("Location, time, and safety")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OceanPalette.ink)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.46))
+        )
+    }
+
+    private func metadataModeControl(
+        title: String,
+        selection: Binding<ProductionWorkflowViewModel.FieldUpdateDetails.MetadataFieldMode>,
+        summary: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(OceanPalette.ink)
+
+            Picker(title, selection: selection) {
+                ForEach(ProductionWorkflowViewModel.FieldUpdateDetails.MetadataFieldMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(summary)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(OceanPalette.ink.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func detailField(title: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(OceanPalette.ink)
+
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.sentences)
+                .autocorrectionDisabled(false)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(OceanPalette.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(0.58))
+                )
         }
     }
 

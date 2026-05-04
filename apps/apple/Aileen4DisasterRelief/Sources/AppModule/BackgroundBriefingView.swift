@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BackgroundBriefingView: View {
     @EnvironmentObject private var appState: AppState
@@ -22,6 +23,17 @@ struct BackgroundBriefingView: View {
                     minHeight: 310
                 )
                 .accessibilityLabel("Background briefing")
+
+                Button {
+                    UIPasteboard.general.string = appState.backgroundBriefing
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.on.doc")
+                        Text("Copy briefing")
+                    }
+                }
+                .buttonStyle(OceanSecondaryButtonStyle())
+                .disabled(appState.backgroundBriefing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
     }
