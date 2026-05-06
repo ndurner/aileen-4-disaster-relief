@@ -392,7 +392,39 @@ final class AppleMediaTooling: @unchecked Sendable {
         }
 
         let candidate = String(trimmed[range])
-        return assets[candidate] == nil ? nil : candidate
+        if assets[candidate] != nil {
+            return candidate
+        }
+
+        let loosePattern = #"\b(asset|rendered)_+(\d+)\b"#
+        if let looseRange = trimmed.range(of: loosePattern, options: .regularExpression) {
+            let looseCandidate = String(trimmed[looseRange])
+                .replacingOccurrences(of: #"_+"#, with: "_", options: .regularExpression)
+            if assets[looseCandidate] != nil {
+                return looseCandidate
+            }
+        }
+
+        if trimmed.contains("asset") {
+            let sourceAssetIDs = assets.values
+                .filter { $0.baseAssetID == nil && $0.toolID.hasPrefix("asset_") }
+                .map(\.toolID)
+                .sorted()
+            if sourceAssetIDs.count == 1 {
+                return sourceAssetIDs[0]
+            }
+        }
+
+        if trimmed.contains("rendered") {
+            let renderedAssetIDs = assets.keys
+                .filter { $0.hasPrefix("rendered_") }
+                .sorted()
+            if renderedAssetIDs.count == 1 {
+                return renderedAssetIDs[0]
+            }
+        }
+
+        return nil
     }
 
     private func composeAssetIDs(from arguments: [String: LiteRTToolValue]) -> [String]? {

@@ -30,6 +30,21 @@ actor GemmaTextRunner {
         )
     }
 
+    func makePromptSession(
+        modelURL: URL,
+        systemMessageJSON: String? = nil,
+        extraContextJSON: String? = nil,
+        samplerSeed: Int32? = nil
+    ) throws {
+        try configureSession(
+            modelURL: modelURL,
+            toolsJSON: nil,
+            systemMessageJSON: systemMessageJSON,
+            extraContextJSON: extraContextJSON,
+            samplerSeed: samplerSeed
+        )
+    }
+
     func makeToolSession(
         modelURL: URL,
         toolsJSON: String,
