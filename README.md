@@ -13,9 +13,10 @@ The current implementation is an Apple client that can:
 - run a tool-calling production workflow that renders overlays with
   Apple-native media frameworks
 - generate shareable visual outputs and accompanying post-body text
+- export Desk Mode packages that can be completed in a browser by the Relay Desk
 
-A future datacenter-side implementation will live alongside the Apple app in
-this same repository, but with a different runtime and deployment model.
+The repository also contains a Gradio Relay Desk for trusted recipients who have
+connectivity and can complete or review a field package in a browser.
 
 ## Status
 
@@ -33,6 +34,8 @@ Current repository state:
   runtime
 - overlay experimentation is separated into the overlay lab so prompt and
   tool-contract work stays auditable
+- the Relay Desk Gradio app is available as the trusted-recipient browser app
+  for completing Desk Mode packages locally and reviewing Field Mode handoffs
 
 Still intentionally incomplete:
 
@@ -49,7 +52,8 @@ Still intentionally incomplete:
 ├── apps/
 │   └── apple/                  # Apple client app and Apple-only helpers
 ├── services/
-│   └── datacenter/             # Future server-side product
+│   ├── datacenter/             # Future server-side product
+│   └── relay-desk/             # Gradio trusted-recipient web app
 └── scratch/                    # Ignored local experiments and validation data
 ```
 
@@ -72,6 +76,10 @@ More specifically:
 - `services/datacenter/`
   Reserved for the future datacenter-side implementation, which is expected to
   use different serving/runtime choices than the Apple app.
+- `services/relay-desk/`
+  Gradio app for opening a field package, completing the desk-side Gemma 4 E4B
+  path on Hugging Face ZeroGPU, rendering a labeled story visual, and exporting
+  recipient artifacts.
 - `.model-cache-stash/`
   Optional ignored local model cache if you choose to keep model files near the
   repo. Do not commit model files.
@@ -108,8 +116,8 @@ The Apple app supports two collaborator modes:
   and produce overlay media, post body text, relay packet data, and a share
   package.
 - Desk Mode: generate later. Do not call Gemma 4 from the app. Package the raw
-  story, background briefing, requested outputs, media manifest, and unprocessed
-  selected media for a trusted recipient.
+  story, optional field-update details, media manifest, and unprocessed selected
+  media for a trusted recipient.
 
 Field Mode supports two inference modes.
 
@@ -171,6 +179,12 @@ Exports are written into the app's Documents area as an Aileen YAML package:
 - `media/` containing produced visual outputs in Field Mode, including rendered
   overlays, or unprocessed selected media in Desk Mode
 
+Relay Desk consumes the same Desk Mode package plus the transferred media. For
+still images it runs Gemma 4 E4B in a Hugging Face ZeroGPU Gradio Space, renders
+the final story visual with Python image tooling, then exports the finished
+caption, alt text, relay note, review checklist, original media, and rendered
+image.
+
 Media `source_type` records the best pre-render provenance signal for the
 produced media. This is intentionally stored in YAML because adding overlays can
 invalidate embedded C2PA manifests, and downstream messaging or social apps may
@@ -213,7 +227,7 @@ media:
 
 Desk Mode packages are declarative job cards. They carry raw inputs, but
 intentionally omit generated post text and overlay-rendered media until a later
-Decoder workflow creates the finished post.
+Relay Desk workflow creates the finished post.
 
 Location and time are controlled from the app's optional details section. Update
 time defaults to image metadata when available. Location defaults to omitted;
@@ -257,6 +271,20 @@ Build quietly for simulator:
 cd apps/apple
 scripts/build_apple_quiet.sh simulator
 ```
+
+Run the Relay Desk locally:
+
+```bash
+cd services/relay-desk
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+Relay Desk is designed for a Hugging Face Gradio Space on ZeroGPU. It uses
+`google/gemma-4-E4B-it` through Transformers, renders the story image with
+Pillow, and does not call the Gemini API or Apple frameworks.
 
 Restore Google AI Edge artifacts after a fresh clone:
 

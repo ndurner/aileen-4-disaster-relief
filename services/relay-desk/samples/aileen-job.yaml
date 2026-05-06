@@ -1,0 +1,24 @@
+aileen_job_version: 1
+
+execution:
+  mode: remote_generate
+
+story:
+  raw: |-
+    A small rescue group checked a sheltered recovery area this afternoon.
+    Several animals are stable after overnight care. The team wants to thank
+    nearby volunteers and remind people not to approach injured wildlife without
+    calling a trained carer first.
+
+field_update:
+  location_label: "Ningaloo coast"
+  update_time_local: "Apr 4, 2026 afternoon"
+  safety_warning: |-
+    Keep public location broad; avoid exact rescue, private, supply, route,
+    and responder staging locations.
+
+media:
+  - id: media_001
+    filename: "media/photo_001.jpg"
+    type: photo
+    source_type: synthetic_demo_image
