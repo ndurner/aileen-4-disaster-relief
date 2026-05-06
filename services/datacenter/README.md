@@ -5,8 +5,8 @@ Aileen 4 Disaster Relief.
 
 The current browser-accessible trusted-recipient prototype lives in
 `services/relay-desk/`. That Gradio app opens a field package, runs Gemma 4 E4B
-on Hugging Face ZeroGPU, renders the labeled story visual with Python image
-tooling, and exports recipient artifacts for the Desk Mode workflow.
+on Hugging Face ZeroGPU, renders the overlaid story visual with Python image
+tooling, generates the post text, and exports the completed Desk Mode package.
 
 Expected future responsibilities:
 

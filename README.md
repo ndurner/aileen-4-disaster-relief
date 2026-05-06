@@ -12,7 +12,7 @@ The current implementation is an Apple client that can:
   Gemini API
 - run a tool-calling production workflow that renders overlays with
   Apple-native media frameworks
-- generate shareable visual outputs and accompanying post-body text
+- generate shareable visual outputs and accompanying post text
 - export Desk Mode packages that can be completed in a browser by the Relay Desk
 
 The repository also contains a Gradio Relay Desk for trusted recipients who have
@@ -78,8 +78,8 @@ More specifically:
   use different serving/runtime choices than the Apple app.
 - `services/relay-desk/`
   Gradio app for opening a field package, completing the desk-side Gemma 4 E4B
-  path on Hugging Face ZeroGPU, rendering a labeled story visual, and exporting
-  recipient artifacts.
+  path on Hugging Face ZeroGPU, rendering the overlaid story visual, generating
+  the post text, and exporting the completed package.
 - `.model-cache-stash/`
   Optional ignored local model cache if you choose to keep model files near the
   repo. Do not commit model files.
@@ -113,8 +113,7 @@ Current product areas in the app:
 The Apple app supports two collaborator modes:
 
 - Field Mode: generate here. Run Gemma 4 through the selected inference backend
-  and produce overlay media, post body text, relay packet data, and a share
-  package.
+  and produce overlay media, post text, and a share package.
 - Desk Mode: generate later. Do not call Gemma 4 from the app. Package the raw
   story, optional field-update details, media manifest, and unprocessed selected
   media for a trusted recipient.
@@ -181,9 +180,9 @@ Exports are written into the app's Documents area as an Aileen YAML package:
 
 Relay Desk consumes the same Desk Mode package plus the transferred media. For
 still images it runs Gemma 4 E4B in a Hugging Face ZeroGPU Gradio Space, renders
-the final story visual with Python image tooling, then exports the finished
-caption, alt text, relay note, review checklist, original media, and rendered
-image.
+the final story visual with Python image tooling, generates the same post text
+stage as Field Mode, and exports a completed package containing
+`aileen-job.yaml` plus produced media under `media/`.
 
 Media `source_type` records the best pre-render provenance signal for the
 produced media. This is intentionally stored in YAML because adding overlays can
@@ -284,7 +283,9 @@ python app.py
 
 Relay Desk is designed for a Hugging Face Gradio Space on ZeroGPU. It uses
 `google/gemma-4-E4B-it` through Transformers, renders the story image with
-Pillow, and does not call the Gemini API or Apple frameworks.
+Pillow, and does not call the Gemini API. Local Apple Silicon runs use PyTorch
+MPS automatically when available; set `AILEEN_RELAY_DEVICE=cpu`, `mps`, or
+`cuda` to override device selection.
 
 Restore Google AI Edge artifacts after a fresh clone:
 

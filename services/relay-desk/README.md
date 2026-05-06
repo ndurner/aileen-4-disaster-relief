@@ -17,17 +17,20 @@ startup_duration_timeout: 1h
 
 Relay Desk is the trusted-recipient browser app for Aileen Desk Mode packages.
 It opens the field package, accepts the media that travelled with it, finishes
-the public update in the Space, and exports the final recipient package.
+the same picture and post-text workflow the field app would have run, and
+exports the completed package.
 
 It prepares:
 
-- labeled story visual rendered from the attached photo
-- social caption
-- alt text
-- compact relay note
-- recipient review checklist
-- downloadable ZIP with the original package, original media, text artifacts,
-  and `outputs/story-visual.jpg`
+- overlaid story visual rendered from the attached photo
+- post text
+- downloadable ZIP with `aileen-job.yaml` and produced media under `media/`
+
+`PARITY.md` records the iOS/Relay Desk behavior contract. Relay Desk treats a
+Desk Mode package as a delayed Field Mode run, not as a separate artifact type.
+The exported ZIP writes `execution.mode: field_completed`, preserves
+`story.raw`, adds `story.post_body`, and points the single produced still image
+at `media/media_001.jpg`.
 
 ## ZeroGPU Shape
 
@@ -39,12 +42,12 @@ The app uses:
 - `spaces.GPU` on the package-completion function
 - `google/gemma-4-E4B-it`
 - `AutoProcessor` and `AutoModelForMultimodalLM`
-- PyTorch on the ZeroGPU allocation
-- Pillow for the final story-image overlay
+- PyTorch on the ZeroGPU allocation in Space deployment
+- Pillow for the local story-image overlay
 - Debian font packages from `packages.txt`
 
 It does not call Gemini, does not shell out to a local command, and does not use
-Apple frameworks.
+Apple frameworks in Space deployment.
 
 ZeroGPU is Gradio-SDK only, so this Space does not use a Dockerfile. System
 packages such as fonts belong in `packages.txt`; Hugging Face installs each line
@@ -67,3 +70,14 @@ python3 -m venv .venv
 pip install -r requirements.txt
 python app.py
 ```
+
+On Apple Silicon, local execution selects PyTorch MPS automatically before
+falling back to CPU. Override the device when needed:
+
+```bash
+AILEEN_RELAY_DEVICE=mps python app.py
+```
+
+Valid values are `auto`, `mps`, `cuda`, and `cpu`, subject to local PyTorch
+support. The app sets `PYTORCH_ENABLE_MPS_FALLBACK=1` by default so unsupported
+MPS operators can fall back instead of aborting the run.
