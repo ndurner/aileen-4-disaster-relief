@@ -24,7 +24,8 @@ actor GoogleAIStudioToolCallingEngine {
         systemInstruction: String,
         protectedRegionProvider: OverlayProtectedRegionProvider = .none,
         protectedRegionsOverride: OverlayProtectedRegions = .empty,
-        layoutGuideOverride: OverlayLayoutGuide = .empty
+        layoutGuideOverride: OverlayLayoutGuide = .empty,
+        postReviewMode: OverlayPostReviewMode = .none
     ) async throws -> ToolExecutionResult {
         let tooling = AppleMediaTooling(
             sourceAssets: sourceAssets,
@@ -142,6 +143,29 @@ actor GoogleAIStudioToolCallingEngine {
             finalText = parsed.text
         }
 
+        if postReviewMode != .none,
+           let currentProducedURL = latestProducedURL,
+           let currentAssetID = GemmaToolCallingEngine.latestRenderedAssetID(from: responsePayloads) {
+            let reviewContext = GemmaToolCallingEngine.latestOverlayReviewContext(from: seenCalls, payloads: responsePayloads)
+            let reviewResult = try await runFreshOverlayReview(
+                model: model,
+                renderedURL: currentProducedURL,
+                renderedAssetID: currentAssetID,
+                tooling: tooling,
+                layoutGuideOverride: layoutGuideOverride,
+                reviewContext: reviewContext,
+                mode: postReviewMode
+            )
+            seenCalls.append(contentsOf: reviewResult.toolCalls)
+            responsePayloads.append(contentsOf: reviewResult.toolResponsePayloads)
+            latestProducedURL = reviewResult.latestProducedURL ?? latestProducedURL
+            if !reviewResult.finalText.isEmpty {
+                finalText = reviewResult.finalText
+            }
+            rawResponses.append(contentsOf: reviewResult.rawResponses)
+            thoughtTraces.append(contentsOf: reviewResult.thoughtTraces)
+        }
+
         return ToolExecutionResult(
             toolCalls: seenCalls,
             toolResponsePayloads: responsePayloads,
@@ -161,6 +185,129 @@ actor GoogleAIStudioToolCallingEngine {
         Call compose_visuals now using only the exact asset IDs listed in <valid_source_asset_ids>.
         Do not use filenames, uploaded file handles, or invented asset identifiers.
         """
+    }
+
+    private func runFreshOverlayReview(
+        model: CloudModelOption,
+        renderedURL: URL,
+        renderedAssetID: String,
+        tooling: AppleMediaTooling,
+        layoutGuideOverride: OverlayLayoutGuide,
+        reviewContext: OverlayReviewContext?,
+        mode: OverlayPostReviewMode
+    ) async throws -> (toolCalls: [LiteRTToolCall], toolResponsePayloads: [String], latestProducedURL: URL?, finalText: String, rawResponses: [String], thoughtTraces: [String]) {
+        let renderedAsset = ProductionAssetDescriptor(
+            toolID: renderedAssetID,
+            mediaAsset: MediaAsset(
+                kind: .image,
+                originalURL: renderedURL,
+                localCopyURL: renderedURL,
+                displayName: renderedURL.lastPathComponent
+            )
+        )
+        let reviewAssets = try tooling.makeOverlayReviewAssets(
+            renderedAssetID: renderedAssetID,
+            renderedURL: renderedURL,
+            reviewContext: reviewContext
+        ) + [renderedAsset]
+        let prompt = ReviewToolSchema.reviewPrompt(
+            renderedAssetID: renderedAssetID,
+            guide: layoutGuideOverride,
+            reviewContext: reviewContext,
+            mode: mode
+        )
+
+        Self.logOutgoingTurn(label: "visual review user turn 1", text: prompt, assets: reviewAssets)
+        var contents: [[String: Any]] = [
+            try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: reviewAssets)
+        ]
+        var response = try await client.sendGenerateContent(
+            model: model,
+            contents: GoogleAIStudioContents(value: contents),
+            systemInstruction: ReviewToolSchema.systemInstruction(allowsAccept: mode.allowsAccept),
+            toolsJSON: ReviewToolSchema.toolsJSON(allowsAccept: mode.allowsAccept),
+            toolConfig: .constrainedToAllowedFunctions(mode.allowsAccept ? ["move_text_overlay", "accept_overlay_layout"] : ["move_text_overlay"])
+        )
+        var parsed = response.parsedMessage
+        Self.logIncomingTurn(label: "visual review model turn 1", response: response)
+
+        var seenCalls: [LiteRTToolCall] = []
+        var responsePayloads: [String] = []
+        var latestProducedURL: URL?
+        var finalText = parsed.text
+        var rawResponses: [String] = [response.rawResponseJSON]
+        var thoughtTraces: [String] = parsed.thoughtText.isEmpty ? [] : [parsed.thoughtText]
+        var toolRounds = 0
+        let maxReviewToolRounds = mode.allowsAccept ? 2 : 1
+
+        while !parsed.toolCalls.isEmpty {
+            toolRounds += 1
+            if toolRounds > maxReviewToolRounds {
+                break
+            }
+            seenCalls.append(contentsOf: parsed.toolCalls)
+            var responses: [MediaToolResult] = []
+            for toolCall in parsed.toolCalls {
+                responses.append(try await tooling.execute(toolCall: toolCall))
+            }
+            Self.logToolResponses(responses)
+            responsePayloads.append(contentsOf: responses.map { ProductionToolSchema.stringify($0.payload) })
+            latestProducedURL = responses.compactMap(\.outputURL).last ?? latestProducedURL
+
+            contents.append(response.modelContentObject.value)
+            contents.append(GoogleAIStudioMessageFactory.functionResponseMessage(
+                toolCalls: parsed.toolCalls,
+                responses: responses
+            ))
+            guard let continuation = try reviewContinuationMessage(responses: responses) else {
+                break
+            }
+            contents.append(continuation)
+
+            response = try await client.sendGenerateContent(
+                model: model,
+                contents: GoogleAIStudioContents(value: contents),
+                systemInstruction: ReviewToolSchema.systemInstruction(allowsAccept: mode.allowsAccept),
+                toolsJSON: ReviewToolSchema.toolsJSON(allowsAccept: mode.allowsAccept),
+                toolConfig: .constrainedToAllowedFunctions(mode.allowsAccept ? ["move_text_overlay", "accept_overlay_layout"] : ["move_text_overlay"])
+            )
+            parsed = response.parsedMessage
+            Self.logIncomingTurn(label: "visual review model turn \(toolRounds + 1)", response: response)
+            finalText = parsed.text
+            rawResponses.append(response.rawResponseJSON)
+            if !parsed.thoughtText.isEmpty {
+                thoughtTraces.append(parsed.thoughtText)
+            }
+        }
+
+        return (seenCalls, responsePayloads, latestProducedURL, finalText, rawResponses, thoughtTraces)
+    }
+
+    private func reviewContinuationMessage(responses: [MediaToolResult]) throws -> [String: Any]? {
+        guard let latestRendered = responses.last(where: { $0.outputURL != nil }),
+              let renderedURL = latestRendered.outputURL,
+              let renderedAssetID = latestRendered.payload["asset_id"] as? String else {
+            return nil
+        }
+
+        let renderedAsset = ProductionAssetDescriptor(
+            toolID: renderedAssetID,
+            mediaAsset: MediaAsset(
+                kind: MediaAsset.kind(for: renderedURL),
+                originalURL: renderedURL,
+                localCopyURL: renderedURL,
+                displayName: renderedURL.lastPathComponent
+            )
+        )
+        let prompt = """
+        Continue the same rendered-overlay review from this updated frame.
+        The attached image is the current rendered state for asset_id \(renderedAssetID).
+        Judge the actual pixels in this attached image.
+        If the current label is excellent and production-ready, stop without another tool call or use accept_overlay_layout if available.
+        If this is a close call, do not accept it.
+        If the label still clearly needs a material placement or style improvement, choose a clean open rectangle yourself and call move_text_overlay on asset_id \(renderedAssetID) with x, y, width, and height.
+        """
+        return try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [renderedAsset])
     }
 
     private func allowedFunctionNames(after responses: [MediaToolResult]) -> [String]? {

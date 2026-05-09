@@ -13,13 +13,14 @@ struct ToolExecutionResult {
     let thoughtTraces: [String]
 }
 
-private struct OverlayReviewContext {
+struct OverlayReviewContext {
     let overlayText: String?
     let style: String?
     let x: Int?
     let y: Int?
     let width: Int?
     let height: Int?
+    let sourceAssetID: String?
 }
 
 enum OverlayPostReviewMode: String, Decodable {
@@ -213,6 +214,11 @@ actor GemmaToolCallingEngine {
                 displayName: renderedURL.lastPathComponent
             )
         )
+        let reviewAssets = try tooling.makeOverlayReviewAssets(
+            renderedAssetID: renderedAssetID,
+            renderedURL: renderedURL,
+            reviewContext: reviewContext
+        ) + [renderedAsset]
         let prompt = ReviewToolSchema.reviewPrompt(
             renderedAssetID: renderedAssetID,
             guide: layoutGuideOverride,
@@ -220,7 +226,7 @@ actor GemmaToolCallingEngine {
             mode: mode
         )
         var parsed = try await runner.sendJSON(
-            ProductionToolSchema.userMessageJSON(text: prompt, assets: [renderedAsset])
+            ProductionToolSchema.userMessageJSON(text: prompt, assets: reviewAssets)
         )
         var seenCalls: [LiteRTToolCall] = []
         var responsePayloads: [String] = []
@@ -294,7 +300,7 @@ actor GemmaToolCallingEngine {
         )
     }
 
-    private static func latestRenderedAssetID(from payloads: [String]) -> String? {
+    static func latestRenderedAssetID(from payloads: [String]) -> String? {
         payloads
             .compactMap { payload -> String? in
                 guard let data = payload.data(using: .utf8),
@@ -306,7 +312,7 @@ actor GemmaToolCallingEngine {
             .last
     }
 
-    private static func latestOverlayReviewContext(
+    static func latestOverlayReviewContext(
         from toolCalls: [LiteRTToolCall],
         payloads: [String]
     ) -> OverlayReviewContext? {
@@ -330,7 +336,8 @@ actor GemmaToolCallingEngine {
             x: latestPayload?["x"] as? Int,
             y: latestPayload?["y"] as? Int,
             width: latestPayload?["overlay_width"] as? Int,
-            height: latestPayload?["overlay_height"] as? Int
+            height: latestPayload?["overlay_height"] as? Int,
+            sourceAssetID: latestPayload?["source_asset_id"] as? String
         )
     }
 }
@@ -531,7 +538,7 @@ enum ProductionToolSchema {
 
 }
 
-private enum ReviewToolSchema {
+enum ReviewToolSchema {
     private static let moveToolJSON = """
     [
       {
@@ -647,7 +654,11 @@ private enum ReviewToolSchema {
     }
 
     static func systemMessageJSON(allowsAccept: Bool) -> String {
-        let instruction = allowsAccept
+        ProductionToolSchema.systemTextJSON(systemInstruction(allowsAccept: allowsAccept))
+    }
+
+    static func systemInstruction(allowsAccept: Bool) -> String {
+        allowsAccept
             ? """
             You are reviewing a rendered social-media image that already has one drawn text label.
             Judge the actual pixels in the attached image, not the prior reasoning.
@@ -663,7 +674,6 @@ private enum ReviewToolSchema {
             Use move_text_overlay only when you can clearly improve placement or style.
             If you cannot clearly improve the current drawn label, do not call any tool.
             """
-        return ProductionToolSchema.systemTextJSON(instruction)
     }
 
     static func reviewPrompt(
@@ -673,9 +683,12 @@ private enum ReviewToolSchema {
         mode: OverlayPostReviewMode
     ) -> String {
         var lines = [
-            "The attached image already has one text label drawn onto it.",
+            "The attachments show the current drawn label in review form.",
+            "When present, the first attachment is the clean frame with a red outline marking the current full sticker rectangle.",
+            "When present, the second attachment is a coordinate scaffold for the same frame.",
+            "The final attachment is the current rendered label.",
             "Your job is to judge that drawn label, not to imagine a new blank image.",
-            "Look only at the single attached image and decide whether the current drawn label should stay where it is or be moved.",
+            "Use the clean red-outline frame to judge what the sticker rectangle covers, and use the coordinate scaffold to choose exact replacement coordinates.",
             "Do not defend the earlier choice just because it already exists.",
             "The earlier placement is only a draft. Do not approve it just because it already exists.",
             "Close call means move. Accept only when you would hand off the image unchanged for production.",
@@ -683,6 +696,7 @@ private enum ReviewToolSchema {
             "If the clean placement would make a tall text wall, shorten overlay_text and keep the same meaning.",
             "If a corner or side label needs four lines or feels like a tall block, shorten overlay_text and keep the same meaning.",
             "Judge the whole sticker box, not just the black text letters.",
+            "If a red outline image is attached, judge the full red-outlined rectangle: top edge, bottom edge, left edge, and right edge.",
             "Check the top edge, bottom edge, left edge, and right edge of the box.",
             "Use the 1080x1350 pixel coordinate system: x grows left to right, y grows top to bottom.",
             "If moving, choose your own clean open rectangle, then call move_text_overlay with all four integers: x, y, width, height.",

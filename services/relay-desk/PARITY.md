@@ -71,18 +71,21 @@ Field Mode parity.
   arguments as an explicit slot even when the model also emits stale normalized
   hints. Partial rectangle follow-ups are rejected so the correction stage does
   not silently preserve a bad prior slot.
-- The Relay correction pass attaches a temporary coordinate scaffold with
-  coarse A1-F6 cells and pixel anchor dots so the VLM can judge the rendered
-  image and choose its own correction rectangle. The scaffold is not part of
-  the final rendered output and is not a deterministic placement scorer.
+- The Relay correction pass and iOS production correction pass attach temporary
+  review aids: a clean frame with a red outline marking the current sticker box,
+  a coordinate scaffold with coarse A1-F6 cells and pixel anchor dots, and the
+  current rendered label. These aids let the VLM judge coverage and choose its
+  own correction rectangle. The aids are not part of the final rendered output
+  and are not deterministic placement scorers.
 - Relay batch runs enable Gemma thinking by default and persist raw responses
   plus extracted thought traces so prompt failures can be diagnosed from the
   model's own correction-stage reasoning.
-- Relay Desk rejects malformed correction moves that provide only part of an
-  explicit rectangle, and it rejects wide upper-row correction banners. Those
-  validation errors are fed back to Gemma so the correction stage can retry with
-  complete coordinates in a safer slot. Accept prompts are intentionally strict:
-  close calls should move rather than approving a previous draft placement.
+- Relay Desk and the iOS media tooling reject malformed correction moves that
+  provide only part of an explicit rectangle, and they reject wide upper-row
+  correction banners. Those validation errors are fed back to Gemma so the
+  correction stage can retry with complete coordinates in a safer slot. Accept
+  prompts are intentionally strict: close calls should move rather than
+  approving a previous draft placement.
 - Relay rendering must never silently drop overlay words to satisfy a requested
   line count; full text visibility is a correction-stage accept criterion.
 - Full Gemma overlay pre-analysis can be added later by porting

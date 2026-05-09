@@ -1907,7 +1907,13 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
                 [
                     {"type": "image", "image": open_image(latest_output_path)},
                     {"type": "image", "image": open_image(grid_path)},
-                    {"type": "text", "text": rendered_overlay_review_prompt(results, includes_clean_reference=clean_reference_path is not None)},
+                    {
+                        "type": "text",
+                        "text": rendered_overlay_review_prompt(
+                            results,
+                            includes_clean_reference=clean_reference_path is not None,
+                        ),
+                    },
                 ]
             )
             messages.append(
@@ -1937,7 +1943,10 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
     )
 
 
-def rendered_overlay_review_prompt(results: list[MediaToolResult], includes_clean_reference: bool = False) -> str:
+def rendered_overlay_review_prompt(
+    results: list[MediaToolResult],
+    includes_clean_reference: bool = False,
+) -> str:
     payload = next((result.payload for result in reversed(results) if result.output_path), {})
     rendered_id = str(payload.get("asset_id") or "the rendered asset")
     status = str(payload.get("status") or "")

@@ -280,6 +280,7 @@ final class AppleMediaTooling: @unchecked Sendable {
 
     private var assets: [String: RenderedAsset]
     private var nextRenderedAssetIndex = 1
+    private var assetsWithRejectedPartialRect = Set<String>()
     private let outputKind: ProductionWorkflowViewModel.OutputKind
     private let renderCanvasSize: CGSize
     private let protectedRegionProvider: OverlayProtectedRegionProvider
@@ -329,6 +330,57 @@ final class AppleMediaTooling: @unchecked Sendable {
         default:
             throw MediaToolingError.unsupportedTool(toolCall.name)
         }
+    }
+
+    func makeOverlayReviewAssets(
+        renderedAssetID: String,
+        renderedURL: URL,
+        reviewContext: OverlayReviewContext?
+    ) throws -> [ProductionAssetDescriptor] {
+        guard let reviewContext,
+              let x = reviewContext.x,
+              let y = reviewContext.y,
+              let width = reviewContext.width,
+              let height = reviewContext.height else {
+            return []
+        }
+
+        let currentAsset = try resolveAsset(renderedAssetID)
+        let sourceAssetID = reviewContext.sourceAssetID ?? currentAsset.baseAssetID
+        guard let sourceAssetID,
+              let sourceAsset = try? resolveAsset(sourceAssetID),
+              sourceAsset.kind == .image else {
+            return []
+        }
+
+        let rect = CGRect(
+            x: CGFloat(x),
+            y: CGFloat(y),
+            width: CGFloat(max(width, 1)),
+            height: CGFloat(max(height, 1))
+        )
+        let outlineURL = try renderOverlayReviewOutline(on: sourceAsset.url, overlayRect: rect)
+        let gridURL = try renderOverlayReviewGrid(on: renderedURL)
+        return [
+            ProductionAssetDescriptor(
+                toolID: "review_outline",
+                mediaAsset: MediaAsset(
+                    kind: .image,
+                    originalURL: outlineURL,
+                    localCopyURL: outlineURL,
+                    displayName: outlineURL.lastPathComponent
+                )
+            ),
+            ProductionAssetDescriptor(
+                toolID: "review_grid",
+                mediaAsset: MediaAsset(
+                    kind: .image,
+                    originalURL: gridURL,
+                    localCopyURL: gridURL,
+                    displayName: gridURL.lastPathComponent
+                )
+            )
+        ]
     }
 
     private func composeVisuals(arguments: [String: LiteRTToolValue]) async throws -> MediaToolResult {
@@ -443,6 +495,7 @@ final class AppleMediaTooling: @unchecked Sendable {
             throw MediaToolingError.invalidArguments("move_text_overlay requires an asset with an existing overlay.")
         }
         if let partialRectError = Self.partialExplicitRectError(arguments) {
+            assetsWithRejectedPartialRect.insert(currentAsset.toolID)
             return MediaToolResult(
                 name: "move_text_overlay",
                 payload: [
@@ -450,6 +503,24 @@ final class AppleMediaTooling: @unchecked Sendable {
                     "asset_id": currentAsset.toolID,
                     "accepted": false,
                     "error": partialRectError,
+                    "required_coordinates": ["x", "y", "width", "height"]
+                ],
+                outputURL: currentAsset.url
+            )
+        }
+        let upperRetryError = Self.upperRowRetryError(
+            arguments,
+            afterRejectedPartialRect: assetsWithRejectedPartialRect.contains(currentAsset.toolID)
+        )
+        let upperMoveError = Self.upperRowMoveError(arguments)
+        if let error = upperRetryError ?? upperMoveError {
+            return MediaToolResult(
+                name: "move_text_overlay",
+                payload: [
+                    "status": upperRetryError == nil ? "invalid_upper_move" : "invalid_upper_retry",
+                    "asset_id": currentAsset.toolID,
+                    "accepted": false,
+                    "error": error,
                     "required_coordinates": ["x", "y", "width", "height"]
                 ],
                 outputURL: currentAsset.url
@@ -575,6 +646,118 @@ final class AppleMediaTooling: @unchecked Sendable {
             throw MediaToolingError.missingAsset("Unknown asset_id \(toolID).")
         }
         return asset
+    }
+
+    private func renderOverlayReviewOutline(on imageURL: URL, overlayRect: CGRect) throws -> URL {
+        guard let image = UIImage(contentsOfFile: imageURL.path) else {
+            throw MediaToolingError.imageLoadFailed("Unable to load review outline image.")
+        }
+
+        let canvasSize = image.size
+        let outputURL = outputURL(for: "jpg")
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: Self.rendererFormat())
+        let rendered = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: canvasSize))
+            let cgContext = context.cgContext
+            let scaleX = canvasSize.width / max(renderCanvasSize.width, 1)
+            let scaleY = canvasSize.height / max(renderCanvasSize.height, 1)
+            let scaledRect = CGRect(
+                x: overlayRect.minX * scaleX,
+                y: overlayRect.minY * scaleY,
+                width: overlayRect.width * scaleX,
+                height: overlayRect.height * scaleY
+            )
+            let radius = max(16, min(32, min(scaledRect.width, scaledRect.height) * 0.16))
+            let path = UIBezierPath(roundedRect: scaledRect, cornerRadius: radius)
+            cgContext.saveGState()
+            UIColor(red: 1.0, green: 0.15, blue: 0.15, alpha: 0.12).setFill()
+            path.fill()
+            UIColor(red: 1.0, green: 0.15, blue: 0.15, alpha: 0.96).setStroke()
+            path.lineWidth = max(6, canvasSize.width / 150)
+            path.stroke()
+            cgContext.restoreGState()
+        }
+
+        try writeImage(rendered, to: outputURL, fileType: .jpeg)
+        return outputURL
+    }
+
+    private func renderOverlayReviewGrid(on imageURL: URL) throws -> URL {
+        guard let image = UIImage(contentsOfFile: imageURL.path) else {
+            throw MediaToolingError.imageLoadFailed("Unable to load review grid image.")
+        }
+
+        let canvasSize = image.size
+        let outputURL = outputURL(for: "jpg")
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: Self.rendererFormat())
+        let rendered = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: canvasSize))
+            drawOverlayReviewGrid(in: context.cgContext, canvasSize: canvasSize)
+        }
+
+        try writeImage(rendered, to: outputURL, fileType: .jpeg)
+        return outputURL
+    }
+
+    private func drawOverlayReviewGrid(in context: CGContext, canvasSize: CGSize) {
+        let columns = 6
+        let rows = 6
+        let columnWidth = canvasSize.width / CGFloat(columns)
+        let rowHeight = canvasSize.height / CGFloat(rows)
+        let labelFont = UIFont.boldSystemFont(ofSize: max(22, canvasSize.width * 0.026))
+        let axisFont = UIFont.boldSystemFont(ofSize: max(16, canvasSize.width * 0.018))
+        let anchorFont = UIFont.boldSystemFont(ofSize: max(14, canvasSize.width * 0.015))
+        let labelColor = UIColor(red: 0.06, green: 0.08, blue: 0.1, alpha: 0.94)
+
+        context.saveGState()
+        context.setLineWidth(3)
+        context.setStrokeColor(UIColor(red: 1.0, green: 0.85, blue: 0.25, alpha: 0.58).cgColor)
+        for index in 0...columns {
+            let x = CGFloat(index) * columnWidth
+            context.move(to: CGPoint(x: x, y: 0))
+            context.addLine(to: CGPoint(x: x, y: canvasSize.height))
+            context.strokePath()
+            drawReviewLabel("x\(Int(round(x)))", at: CGPoint(x: min(max(x + 5, 4), canvasSize.width - 90), y: 4), font: axisFont, color: labelColor)
+        }
+        for index in 0...rows {
+            let y = CGFloat(index) * rowHeight
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addLine(to: CGPoint(x: canvasSize.width, y: y))
+            context.strokePath()
+            drawReviewLabel("y\(Int(round(y)))", at: CGPoint(x: 4, y: min(max(y + 5, 4), canvasSize.height - 32)), font: axisFont, color: labelColor)
+        }
+
+        for row in 0..<rows {
+            for column in 0..<columns {
+                let left = CGFloat(column) * columnWidth
+                let top = CGFloat(row) * rowHeight
+                let center = CGPoint(x: left + columnWidth / 2, y: top + rowHeight / 2)
+                let cellLabel = "\(Character(UnicodeScalar(65 + column)!))\(row + 1)"
+                drawReviewLabel(cellLabel, at: CGPoint(x: left + 8, y: top + 8), font: labelFont, color: labelColor)
+                context.setFillColor(UIColor(red: 0.0, green: 0.58, blue: 1.0, alpha: 0.86).cgColor)
+                context.fillEllipse(in: CGRect(x: center.x - 6, y: center.y - 6, width: 12, height: 12))
+                drawReviewLabel(
+                    "\(Int(round(center.x))),\(Int(round(center.y)))",
+                    at: CGPoint(x: center.x - 42, y: center.y + 8),
+                    font: anchorFont,
+                    color: UIColor(red: 0.0, green: 0.28, blue: 0.58, alpha: 0.96)
+                )
+            }
+        }
+        context.restoreGState()
+    }
+
+    private func drawReviewLabel(_ text: String, at origin: CGPoint, font: UIFont, color: UIColor) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color
+        ]
+        let size = text.size(withAttributes: attributes)
+        let rect = CGRect(x: origin.x, y: origin.y, width: size.width + 12, height: size.height + 8)
+        let background = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+        UIColor.white.withAlphaComponent(0.76).setFill()
+        background.fill()
+        text.draw(in: rect.insetBy(dx: 6, dy: 4), withAttributes: attributes)
     }
 
     private func toolAssetID(from arguments: [String: LiteRTToolValue], key: String = "asset_id") -> String? {
@@ -774,6 +957,37 @@ final class AppleMediaTooling: @unchecked Sendable {
         }
         let missingFields = explicitRectFields.filter { arguments[$0] == nil }
         return "Partial rectangle provided. Missing: \(missingFields.joined(separator: ", "))."
+    }
+
+    private static func upperRowRetryError(
+        _ arguments: [String: LiteRTToolValue],
+        afterRejectedPartialRect: Bool
+    ) -> String? {
+        guard afterRejectedPartialRect else {
+            return nil
+        }
+        return upperRowMoveError(
+            arguments,
+            message: "Retry used a wide upper banner after a rejected partial move. Use a compact side/corner slot or open middle rows instead."
+        )
+    }
+
+    private static func upperRowMoveError(
+        _ arguments: [String: LiteRTToolValue],
+        message: String? = nil
+    ) -> String? {
+        let explicitRectFields = ["x", "y", "width", "height"]
+        guard explicitRectFields.allSatisfy({ arguments[$0] != nil }) else {
+            return nil
+        }
+        let y = arguments["y"]?.numberValue
+        let width = arguments["width"]?.numberValue
+        if let y, y < 225 {
+            if width == nil || (width ?? 0) > 560 {
+                return message ?? "Correction move used a wide upper banner. Use a compact side/corner slot or open middle rows instead."
+            }
+        }
+        return nil
     }
 
     private func protectedRegions(for asset: RenderedAsset) throws -> OverlayProtectedRegions {

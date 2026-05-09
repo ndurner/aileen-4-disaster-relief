@@ -77,6 +77,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private static let thinkingExtraContextJSON = ProductionToolSchema.stringify(["enable_thinking": true])
     private static let productionOverlayThinkingEnabled = true
     private static let productionPreAnalysisThinkingEnabled = true
+    private static let productionPostReviewMode: OverlayPostReviewMode = .resultOnly
     private static let productionGuideProvider: OverlayLayoutGuideProvider = .gemmaVision
     private static let productionGuidanceMode: OverlayLayoutGuidanceMode = .band
     private static let packageDateFormatter: ISO8601DateFormatter = {
@@ -610,7 +611,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 samplerSeed: samplerSeed,
                 protectedRegionProvider: .none,
                 protectedRegionsOverride: overlayPreparation.protectedRegions,
-                layoutGuideOverride: overlayPreparation.layoutGuide
+                layoutGuideOverride: overlayPreparation.layoutGuide,
+                postReviewMode: Self.productionPostReviewMode
             )
         } catch {
             await visualRunner.destroySession()
@@ -704,7 +706,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
                 systemInstruction: ProductionPrompts.productionSystemInstruction,
                 protectedRegionProvider: .none,
                 protectedRegionsOverride: overlayPreparation.protectedRegions,
-                layoutGuideOverride: overlayPreparation.layoutGuide
+                layoutGuideOverride: overlayPreparation.layoutGuide,
+                postReviewMode: Self.productionPostReviewMode
             )
         } catch {
             throw cloudStageError("Cloud visual generation failed", underlying: error)
