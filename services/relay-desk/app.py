@@ -21,6 +21,7 @@ from transformers import AutoModelForMultimodalLM, AutoProcessor
 
 
 APP_ROOT = Path(__file__).resolve().parent
+ASSET_ROOT = APP_ROOT / "assets"
 SAMPLE_PACKAGE_PATH = APP_ROOT / "samples" / "aileen-job.yaml"
 MODEL_ID = os.environ.get("AILEEN_RELAY_MODEL_ID", "google/gemma-4-E4B-it")
 MAX_NEW_TOKENS = int(os.environ.get("AILEEN_RELAY_MAX_NEW_TOKENS", "900"))
@@ -70,80 +71,203 @@ model.eval()
 
 CSS = """
 :root {
-  --aileen-ink: #173943;
-  --aileen-muted: #5f7780;
-  --aileen-deep: #0d6a79;
-  --aileen-reef: #57b8b8;
-  --aileen-paper: rgba(255,255,255,0.82);
-  --aileen-coral: #d97562;
+  --aileen-ink: #1c3a45;
+  --aileen-muted: #5c747d;
+  --aileen-deep: #146b80;
+  --aileen-deep-2: #0c4858;
+  --aileen-reef: #4ab8bd;
+  --aileen-tide: #def5f5;
+  --aileen-sand: #fbedd6;
+  --aileen-coral: #f2aa8c;
+  --aileen-paper: rgba(255, 255, 255, 0.74);
+  --aileen-paper-strong: rgba(255, 255, 255, 0.88);
+  --aileen-stroke: rgba(255, 255, 255, 0.74);
+  --aileen-shadow: 0 18px 46px rgba(20, 107, 128, 0.12);
+  --aileen-soft-shadow: 0 12px 30px rgba(20, 107, 128, 0.08);
 }
 
+html,
+body {
+  min-height: 100%;
+  background:
+    linear-gradient(135deg, #f6fbff 0%, #e3f5f3 48%, #fbf0dc 100%) fixed !important;
+}
+
+body.dark,
+.dark,
+gradio-app {
+  background:
+    linear-gradient(135deg, #f6fbff 0%, #e3f5f3 48%, #fbf0dc 100%) fixed !important;
+}
+
+#root,
 .gradio-container {
-  max-width: 1160px !important;
+  max-width: 1180px !important;
   margin: 0 auto !important;
   color: var(--aileen-ink);
-  background:
-    linear-gradient(135deg, #f7fbfb 0%, #eaf6f5 58%, #fbf2e2 100%);
+  background: transparent !important;
+  font-family: ui-rounded, "SF Pro Rounded", "SF Pro Display", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+.gradio-container * {
+  letter-spacing: 0 !important;
+}
+
+.gradio-container > .main,
+.main,
+.contain,
+.wrap,
+.app {
+  background: transparent !important;
+}
+
+.dark .gradio-container,
+.dark .gradio-container .prose,
+.dark .gradio-container label,
+.dark .gradio-container span,
+.dark .gradio-container p,
+.dark .gradio-container h1,
+.dark .gradio-container h2,
+.dark .gradio-container h3,
+.dark .gradio-container h4 {
+  color: inherit;
+}
+
+.gradio-container .prose {
+  color: var(--aileen-ink);
 }
 
 .aileen-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 430px;
+  margin: 18px 0 18px;
   padding: 34px;
-  min-height: 210px;
+  border-radius: 30px;
   background:
-    linear-gradient(90deg, rgba(9,44,54,0.94), rgba(9,44,54,0.58)),
-    #113f49;
-  box-shadow: 0 20px 50px rgba(13,106,121,0.18);
+    linear-gradient(180deg, rgba(12, 72, 88, 0.05) 0%, rgba(12, 72, 88, 0.35) 45%, rgba(18, 44, 52, 0.94) 100%),
+    var(--aileen-deep-2);
+  box-shadow: 0 28px 70px rgba(12, 72, 88, 0.22);
+  isolation: isolate;
+}
+
+.aileen-hero img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.aileen-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(8, 29, 36, 0.76) 0%, rgba(8, 29, 36, 0.30) 48%, rgba(8, 29, 36, 0.12) 100%),
+    linear-gradient(0deg, rgba(8, 29, 36, 0.90) 0%, rgba(8, 29, 36, 0.04) 60%);
+}
+
+.aileen-hero__copy {
+  max-width: 610px;
 }
 
 .aileen-hero h1 {
   margin: 0 0 10px;
   color: white;
-  font-size: clamp(2.1rem, 5vw, 4.4rem);
+  font-size: 64px;
   line-height: 0.98;
+  font-weight: 800;
   letter-spacing: 0;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .aileen-hero p {
   margin: 0;
-  max-width: 680px;
-  color: rgba(255,255,255,0.90);
-  font-size: 1.05rem;
+  max-width: 560px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 18px;
+  font-weight: 600;
   line-height: 1.45;
+}
+
+.aileen-hero__status {
+  width: min(290px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.12);
+}
+
+.aileen-hero__status span {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.aileen-hero__status strong {
+  display: block;
+  color: white;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.aileen-hero__status p {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .aileen-pill {
   display: inline-flex;
   align-items: center;
-  color: #0f5966;
-  background: rgba(255,255,255,0.76);
-  border: 1px solid rgba(255,255,255,0.90);
-  padding: 8px 12px;
+  color: var(--aileen-deep);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  padding: 8px 13px;
   border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.84rem;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
   margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(8, 29, 36, 0.12);
 }
 
 .aileen-card {
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 28px;
+  padding: 20px;
   background: var(--aileen-paper);
-  border: 1px solid rgba(255,255,255,0.90);
-  box-shadow: 0 14px 30px rgba(13,106,121,0.10);
+  border: 1px solid var(--aileen-stroke);
+  box-shadow: var(--aileen-soft-shadow);
+  backdrop-filter: blur(18px);
 }
 
 .aileen-card h3 {
   margin: 0 0 10px;
   color: var(--aileen-ink);
-  font-size: 1.12rem;
+  font-size: 19px;
+  font-weight: 800;
 }
 
 .aileen-small {
   color: var(--aileen-muted);
-  font-size: 0.94rem;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -151,17 +275,481 @@ CSS = """
   color: var(--aileen-ink);
 }
 
-.aileen-warning {
-  border-left: 4px solid var(--aileen-coral);
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(217,117,98,0.10);
-  color: #68342c;
+.aileen-journey {
+  display: grid;
+  grid-template-columns: 1.1fr repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 18px;
+}
+
+.aileen-journey__intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.aileen-step {
+  min-height: 128px;
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: var(--aileen-soft-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.aileen-step__number {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: 13px;
+  background: var(--aileen-tide);
+  color: var(--aileen-deep);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.aileen-step h4 {
+  margin: 0 0 6px;
+  color: var(--aileen-ink);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.aileen-step p {
+  margin: 0;
+  color: rgba(28, 58, 69, 0.68);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.aileen-workspace {
+  display: block !important;
+}
+
+.aileen-panel {
+  height: auto;
+  padding: 20px !important;
+  border: 1px solid var(--aileen-stroke) !important;
+  border-radius: 30px !important;
+  background: var(--aileen-paper) !important;
+  box-shadow: var(--aileen-shadow) !important;
+  backdrop-filter: blur(18px);
+}
+
+.aileen-panel .styler {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.aileen-panel > .form,
+.aileen-panel .form,
+.aileen-panel .block.hide-container,
+.aileen-panel .gap {
+  background: transparent !important;
+}
+
+.aileen-panel .block:not(.hide-container) {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.74) !important;
+  border-radius: 24px !important;
+  background: rgba(255, 255, 255, 0.52) !important;
+}
+
+.aileen-panel .wrap,
+.aileen-panel .input-container {
+  border-color: rgba(255, 255, 255, 0.74) !important;
+  background: rgba(255, 255, 255, 0.54) !important;
+  color: var(--aileen-ink) !important;
+}
+
+.aileen-panel .block.hide-container .wrap,
+.aileen-panel .block.hide-container .html-container,
+.aileen-panel .block.hide-container .prose {
+  background: transparent !important;
+}
+
+.aileen-panel label,
+.aileen-panel textarea,
+.aileen-panel input,
+.aileen-panel .wrap,
+.aileen-panel .wrap *,
+.aileen-panel .input-container,
+.aileen-panel .input-container * {
+  color: var(--aileen-ink) !important;
+}
+
+.aileen-panel label.float,
+.aileen-panel .float {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  border: 1px solid rgba(20, 107, 128, 0.16) !important;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  background: rgba(222, 245, 245, 0.92) !important;
+  color: var(--aileen-deep) !important;
+  font-weight: 850 !important;
+  box-shadow: 0 6px 16px rgba(20, 107, 128, 0.08) !important;
+}
+
+.aileen-panel label.float svg,
+.aileen-panel .float svg {
+  color: var(--aileen-deep) !important;
+}
+
+.aileen-input-panel label.container > span:first-child {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  margin-bottom: 7px !important;
+  border: 1px solid rgba(20, 107, 128, 0.16) !important;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  background: rgba(222, 245, 245, 0.92) !important;
+  color: var(--aileen-deep) !important;
+  font-weight: 850 !important;
+  box-shadow: 0 6px 16px rgba(20, 107, 128, 0.08) !important;
+}
+
+.aileen-code-output label {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  border: 1px solid rgba(20, 107, 128, 0.16) !important;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  background: rgba(222, 245, 245, 0.92) !important;
+  color: var(--aileen-deep) !important;
+  font-weight: 850 !important;
+  box-shadow: 0 6px 16px rgba(20, 107, 128, 0.08) !important;
+}
+
+.aileen-panel textarea,
+.aileen-panel input {
+  background: rgba(255, 255, 255, 0.62) !important;
+  caret-color: var(--aileen-deep);
+}
+
+.aileen-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.aileen-section-heading h2,
+.aileen-section-heading h3 {
+  margin: 0;
+  color: var(--aileen-ink);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.12;
+}
+
+.aileen-section-heading p {
+  margin: 6px 0 0;
+  color: rgba(28, 58, 69, 0.64);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.aileen-kicker {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--aileen-tide);
+  color: var(--aileen-deep);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.aileen-input-panel textarea,
+.aileen-input-panel input,
+.aileen-input-panel .wrap,
+.aileen-input-panel .container {
+  border-radius: 22px !important;
+}
+
+.aileen-input-panel textarea,
+.aileen-input-panel input[type="text"] {
+  color: var(--aileen-ink) !important;
+  font-weight: 600 !important;
+}
+
+.aileen-input-panel .block,
+.aileen-results-panel .block {
+  border-color: rgba(255, 255, 255, 0.72) !important;
+  background: rgba(255, 255, 255, 0.48) !important;
+}
+
+.aileen-actions {
+  gap: 12px !important;
+}
+
+.aileen-panel button {
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.aileen-panel button:not(.primary) {
+  border: 1px solid rgba(20, 107, 128, 0.18) !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: var(--aileen-deep) !important;
+  box-shadow: 0 8px 20px rgba(20, 107, 128, 0.08) !important;
+}
+
+.aileen-panel button:not(.primary):hover {
+  border-color: rgba(20, 107, 128, 0.30) !important;
+  background: rgba(222, 245, 245, 0.86) !important;
+  box-shadow: 0 10px 24px rgba(20, 107, 128, 0.12) !important;
+}
+
+.aileen-panel button:not(.primary):active {
+  transform: translateY(1px);
+}
+
+.aileen-actions button,
+button.primary,
+button.secondary {
+  min-height: 48px !important;
+  border-radius: 20px !important;
+  font-weight: 800 !important;
 }
 
 button.primary {
-  background: var(--aileen-deep) !important;
-  border-color: var(--aileen-deep) !important;
+  background: linear-gradient(135deg, var(--aileen-deep), var(--aileen-reef)) !important;
+  border-color: transparent !important;
+  color: white !important;
+  box-shadow: 0 12px 28px rgba(20, 107, 128, 0.20) !important;
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.66) !important;
+  border-color: rgba(255, 255, 255, 0.78) !important;
+  color: var(--aileen-deep) !important;
+}
+
+.aileen-preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aileen-summary-card {
+  border-radius: 26px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: var(--aileen-soft-shadow);
+}
+
+.aileen-summary-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.aileen-summary-top h3 {
+  margin: 0;
+  color: var(--aileen-ink);
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.aileen-status {
+  flex: 0 1 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--aileen-tide);
+  color: var(--aileen-deep);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.aileen-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.aileen-summary-grid div {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(222, 245, 245, 0.58);
+}
+
+.aileen-summary-grid dt {
+  margin-bottom: 4px;
+  color: rgba(28, 58, 69, 0.58);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.aileen-summary-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--aileen-ink);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.aileen-warning {
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(242, 170, 140, 0.44);
+  border-radius: 18px;
+  background: rgba(242, 170, 140, 0.18);
+  color: #7a3e30;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.aileen-image-preview {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.78) !important;
+  border-radius: 28px !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+  box-shadow: var(--aileen-soft-shadow);
+}
+
+.aileen-image-preview img {
+  border-radius: 22px !important;
+}
+
+.aileen-results-panel {
+  margin-top: 18px;
+}
+
+.aileen-review-panel {
+  margin-top: 18px;
+}
+
+.aileen-results-panel .row {
+  align-items: flex-start !important;
+}
+
+.aileen-post-shell {
+  margin: 0 0 12px;
+}
+
+.aileen-post-shell p {
+  margin-bottom: 0;
+}
+
+.aileen-label-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: rgba(222, 245, 245, 0.72);
+  color: var(--aileen-deep);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aileen-code-output {
+  border-radius: 24px !important;
+  overflow: hidden;
+}
+
+.aileen-download {
+  border-radius: 24px !important;
+}
+
+footer {
+  opacity: 0.72;
+}
+
+@media (max-width: 980px) {
+  .aileen-journey {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aileen-journey__intro {
+    grid-column: 1 / -1;
+  }
+
+  .aileen-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 500px;
+  }
+
+  .aileen-hero h1 {
+    font-size: 48px;
+  }
+}
+
+@media (max-width: 640px) {
+  .gradio-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .aileen-hero {
+    min-height: 460px;
+    padding: 22px;
+    border-radius: 26px;
+  }
+
+  .aileen-hero h1 {
+    font-size: 36px;
+    line-height: 1.02;
+  }
+
+  .aileen-hero p {
+    font-size: 15px;
+  }
+
+  .aileen-hero__status {
+    padding: 15px;
+  }
+
+  .aileen-journey {
+    grid-template-columns: 1fr;
+  }
+
+  .aileen-panel {
+    padding: 16px !important;
+    border-radius: 26px !important;
+  }
+
+  .aileen-section-heading {
+    display: block;
+  }
+
+  .aileen-kicker {
+    display: inline-flex;
+    margin-top: 10px;
+  }
+
+  .aileen-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 """
 
@@ -409,24 +997,49 @@ def load_sample_package() -> str:
 def hero_html() -> str:
     return """
 <section class="aileen-hero">
-  <div class="aileen-pill">Trusted recipient desk</div>
-  <h1>Aileen Relay Desk</h1>
-  <p>
-    Open the field package, attach the photos that came with it, and finish the
-    same picture and post text the field app would have made.
-  </p>
+  <img src="/gradio_api/file=assets/aileen-production-scene.jpg" alt="" aria-hidden="true">
+  <div class="aileen-hero__copy">
+    <div class="aileen-pill">Trusted recipient desk</div>
+    <h1>Aileen Relay Desk</h1>
+    <p>
+      Receive the field package, attach the transferred photos, and finish the
+      same picture and post text the iOS app would have produced.
+    </p>
+  </div>
+  <aside class="aileen-hero__status" aria-label="Relay Desk status">
+    <span>Desk Mode continuation</span>
+    <strong>Raw package in, finished update out.</strong>
+    <p>Built for delayed Field Mode runs when the phone sends originals onward.</p>
+  </aside>
 </section>
 """
 
 
 def journey_html() -> str:
     return """
-<div class="aileen-card">
-  <h3>Desk handoff</h3>
-  <p class="aileen-small">
-    Desk Mode sends the field note and raw photos onward. This desk finishes
-    the post and exports the package for review.
-  </p>
+<div class="aileen-journey">
+  <div class="aileen-card aileen-journey__intro">
+    <h3>Desk handoff</h3>
+    <p class="aileen-small">
+      Desk Mode sends the field note and raw photos onward. Relay Desk completes
+      the production run and exports the review package.
+    </p>
+  </div>
+  <div class="aileen-step">
+    <div class="aileen-step__number">1</div>
+    <h4>Open package</h4>
+    <p>Use the copied YAML or upload the transferred field file.</p>
+  </div>
+  <div class="aileen-step">
+    <div class="aileen-step__number">2</div>
+    <h4>Attach originals</h4>
+    <p>Add the photos that travelled with the handoff.</p>
+  </div>
+  <div class="aileen-step">
+    <div class="aileen-step__number">3</div>
+    <h4>Finish update</h4>
+    <p>Render the story image, caption, and completed ZIP.</p>
+  </div>
 </div>
 """
 
@@ -519,20 +1132,22 @@ def package_summary(package: dict[str, Any], media_files: list[Any] | None) -> s
     update = field_update(package)
     media = media_items(package)
     uploaded_count = len(media_paths(media_files))
+    location = update.get("location_label") or "Not provided"
+    update_time = update.get("update_time_local") or "Not provided"
 
     parts = [
-        '<div class="aileen-card">',
+        '<div class="aileen-summary-card">',
+        '<div class="aileen-summary-top">',
         "<h3>Field package</h3>",
-        f'<p class="aileen-small"><strong>Status:</strong> {friendly_mode(str(mode))}</p>',
+        f'<span class="aileen-status">{escape_html(friendly_mode(str(mode)))}</span>',
+        "</div>",
+        '<dl class="aileen-summary-grid">',
+        f"<div><dt>Place</dt><dd>{escape_html(location)}</dd></div>",
+        f"<div><dt>Time</dt><dd>{escape_html(update_time)}</dd></div>",
+        f"<div><dt>Media listed</dt><dd>{len(media)}</dd></div>",
+        f"<div><dt>Attached here</dt><dd>{uploaded_count}</dd></div>",
+        "</dl>",
     ]
-    if update.get("location_label"):
-        parts.append(f'<p class="aileen-small"><strong>Place:</strong> {escape_html(update["location_label"])}</p>')
-    if update.get("update_time_local"):
-        parts.append(f'<p class="aileen-small"><strong>Time:</strong> {escape_html(update["update_time_local"])}</p>')
-    parts.append(
-        f'<p class="aileen-small"><strong>Media listed:</strong> {len(media)} - '
-        f'<strong>attached here:</strong> {uploaded_count}</p>'
-    )
     if update.get("safety_warning"):
         parts.append(f'<div class="aileen-warning">{escape_html(update["safety_warning"])}</div>')
     parts.append("</div>")
@@ -1610,16 +2225,15 @@ def output_markdown(post_body: str, visual_result: VisualWorkflowResult) -> str:
     overlay_text = ""
     if overlay_calls:
         overlay_text = str(overlay_calls[-1].arguments.get("overlay_text") or "").strip()
+    image_label = escape_html(overlay_text or "Rendered through media tools.")
     return f"""
-<div class="aileen-card">
+<div class="aileen-card aileen-post-shell">
   <h3>Post text</h3>
   <p class="aileen-small">Review before publishing. This was finished from the field package and attached photos.</p>
+  <span class="aileen-label-chip">Image label: {image_label}</span>
 </div>
 
 {post_body.strip() or "_No post body produced._"}
-
-### Image Label
-{overlay_text or "_Rendered through media tools._"}
 """
 
 
@@ -1655,53 +2269,120 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
     completed_yaml = completed_package_yaml(package, post_body, assets)
     zip_path = create_output_zip(completed_yaml, visual_result.produced_path)
     summary = package_summary(package, media_files)
-    return summary, gr.update(value=visual_result.produced_path, visible=True), output_markdown(post_body, visual_result), completed_yaml, zip_path
+    return (
+        summary,
+        gr.update(value=visual_result.produced_path, visible=True),
+        output_markdown(post_body, visual_result),
+        completed_yaml,
+        gr.update(value=zip_path, visible=True),
+    )
 
 
-with gr.Blocks(css=CSS, title="Aileen Relay Desk") as demo:
+gr.set_static_paths(paths=[ASSET_ROOT])
+
+
+with gr.Blocks(
+    css=CSS,
+    theme=gr.themes.Soft(primary_hue="teal", secondary_hue="cyan", neutral_hue="slate"),
+    title="Aileen Relay Desk",
+) as demo:
     gr.HTML(hero_html())
     gr.HTML(journey_html())
 
-    with gr.Row():
-        with gr.Column(scale=5):
-            with gr.Group():
-                gr.Markdown("### Field Package")
-                package_file = gr.File(
-                    label="Upload package file",
-                    file_count="single",
-                    file_types=[".yaml", ".yml", ".txt"],
-                )
-                package_text = gr.Textbox(
-                    label="Or paste package text",
-                    value=load_sample_package(),
-                    lines=14,
-                    max_lines=24,
-                    placeholder="Paste the package text copied from the field app.",
-                )
-                media_files = gr.File(
-                    label="Attach photos",
-                    file_count="multiple",
-                    file_types=[".png", ".jpg", ".jpeg", ".webp"],
-                )
-                background_briefing = gr.Textbox(
-                    label="Standing briefing",
-                    lines=5,
-                    placeholder="Optional field-team context copied separately when needed.",
-                )
-                with gr.Row():
-                    sample_button = gr.Button("Load sample", variant="secondary")
-                    complete_button = gr.Button("Finish package", variant="primary")
+    with gr.Group(elem_classes=["aileen-panel", "aileen-input-panel"]):
+        gr.HTML(
+            """
+            <div class="aileen-section-heading">
+              <div>
+                <h2>Field Package</h2>
+                <p>Load the desk handoff and attach the media that travelled with it.</p>
+              </div>
+              <span class="aileen-kicker">Inputs</span>
+            </div>
+            """
+        )
+        package_file = gr.File(
+            label="Upload package file",
+            file_count="single",
+            file_types=[".yaml", ".yml", ".txt"],
+        )
+        package_text = gr.Textbox(
+            label="Or paste package text",
+            value=load_sample_package(),
+            lines=14,
+            max_lines=24,
+            placeholder="Paste the package text copied from the field app.",
+        )
+        media_files = gr.File(
+            label="Attach photos",
+            file_count="multiple",
+            file_types=[".png", ".jpg", ".jpeg", ".webp"],
+        )
+        background_briefing = gr.Textbox(
+            label="Standing briefing",
+            lines=5,
+            placeholder="Optional field-team context copied separately when needed.",
+        )
+        with gr.Row(elem_classes=["aileen-actions"]):
+            sample_button = gr.Button("Load sample", variant="secondary")
+            complete_button = gr.Button("Finish package", variant="primary")
 
-        with gr.Column(scale=4):
-            package_summary_html = gr.HTML(
-                '<div class="aileen-card"><h3>Ready</h3><p class="aileen-small">Load a package, attach the transferred photos, then finish the post.</p></div>'
+    with gr.Group(elem_classes=["aileen-panel", "aileen-preview-stack", "aileen-review-panel"]):
+        gr.HTML(
+            """
+            <div class="aileen-section-heading">
+              <div>
+                <h2>Review</h2>
+                <p>Package status and produced visual appear here.</p>
+              </div>
+              <span class="aileen-kicker">Desk</span>
+            </div>
+            """
+        )
+        package_summary_html = gr.HTML(
+            """
+            <div class="aileen-summary-card">
+              <div class="aileen-summary-top">
+                <h3>Ready</h3>
+                <span class="aileen-status">Waiting</span>
+              </div>
+              <p class="aileen-small">Load a package, attach the transferred photos, then finish the post.</p>
+            </div>
+            """
+        )
+        story_visual = gr.Image(
+            label="Produced visual",
+            type="filepath",
+            height=520,
+            visible=False,
+            elem_classes=["aileen-image-preview"],
+        )
+
+    with gr.Group(elem_classes=["aileen-panel", "aileen-results-panel"]):
+        gr.HTML(
+            """
+            <div class="aileen-section-heading">
+              <div>
+                <h2>Finished Post</h2>
+                <p>Caption, completed package text, and export ZIP.</p>
+              </div>
+              <span class="aileen-kicker">Output</span>
+            </div>
+            """
+        )
+        output = gr.Markdown()
+        with gr.Row():
+            completed_yaml_output = gr.Code(
+                label="Finished package text",
+                language="yaml",
+                lines=14,
+                elem_classes=["aileen-code-output"],
             )
-            story_visual = gr.Image(label="Produced visual", type="filepath", height=560, visible=False)
-
-    gr.Markdown("## Finished Post")
-    output = gr.Markdown()
-    completed_yaml_output = gr.Code(label="Finished package text", language="yaml", lines=14)
-    zip_file = gr.File(label="Download completed package")
+            zip_file = gr.File(
+                label="Download completed package",
+                visible=False,
+                elem_classes=["aileen-download"],
+            )
 
     sample_button.click(fn=load_sample_package, outputs=package_text)
     complete_button.click(

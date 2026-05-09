@@ -26,6 +26,10 @@ It prepares:
 - post text
 - downloadable ZIP with `aileen-job.yaml` and produced media under `media/`
 
+The browser UI mirrors the iOS app's ocean-light production surface. Static UI
+artwork lives under `assets/` and is served with Gradio static paths; it is not
+part of the completed field package export.
+
 `PARITY.md` records the iOS/Relay Desk behavior contract. Relay Desk treats a
 Desk Mode package as a delayed Field Mode run, not as a separate artifact type.
 The exported ZIP writes `execution.mode: field_completed`, preserves
