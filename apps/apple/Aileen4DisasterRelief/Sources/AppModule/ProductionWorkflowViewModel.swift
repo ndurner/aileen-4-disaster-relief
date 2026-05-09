@@ -1076,12 +1076,17 @@ enum ProductionPrompts {
         Placement policy:
         - Base placement on the source or rendered frame supplied in the current turn.
         - Prefer one compact sticker-style overlay in available free space.
-        - Avoid placing text on or tight against the main subject's face, body, or primary silhouette.
+        - Before choosing a placement, identify the main visible subject, faces/heads, hair, shoulders, torso, hands doing work, animals, tools, and central story evidence. Story evidence can be objects such as plant guards, enclosures, water bowls, crates, signs, shelters, damaged structures, and supply setups, or scenic evidence such as a sunset band, horizon, skyline, smoke, floodwater, storm clouds, fire glow, or damage.
+        - Avoid placing text or sticker background on or tight against the main subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or primary silhouette.
+        - Do not treat dark clothing, hair, shoulders, story evidence, or plain-looking body areas as empty space.
+        - If using sky or background above the action, keep the whole sticker box in that clean area; do not let its lower edge drop onto guards, stakes, enclosures, hands, animals, or other story objects.
+        - For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself. If normalized hints drift into that band, use exact coordinates.
+        - For upper placements, prefer exact x, y, width, and height so the full box stays in clean sky/background instead of drifting down onto story objects.
         - Keep the composition readable and visually balanced.
 
         Output behavior:
         - Return overlay text only when a plain-text response is required.
-        - Keep the overlay compact.
+        - Keep the overlay compact, usually 3 to 6 words. If a clean corner or side placement would need four text lines, shorten the wording.
         """
 
     static let productionSystemMessageJSON = ProductionToolSchema.systemTextJSON(
@@ -1162,16 +1167,18 @@ enum ProductionPrompts {
         </valid_source_asset_ids>
 
         Placement checklist:
-        1. Find faces, animals, hands, tools, and the main story evidence.
+        1. Find faces, heads, hair, shoulders, torsos, animals, hands, tools, and story evidence such as plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, or damage.
         2. Find empty space: sky, wall, water, open ground, side margin, or corner.
-        3. Do not put the text box directly across faces, bodies, animals, hands, tools, or action.
-        4. Edge faces and profile faces count as faces.
-        5. Upper text is OK only if it does not touch any face or main action.
-        6. Bottom text is OK only if the bottom area is open.
-        7. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
-        8. If a face/profile is in the top rows, do not choose an upper-center band.
-        9. If top or bottom would cover the subject, use side or corner open space.
-        10. For sticker text longer than five words, use two or three lines.
+        3. Do not put the text box or sticker background directly across faces, heads, hair, shoulders, torsos, animals, hands, tools, story evidence, or action.
+        4. Edge faces, profile faces, hair, and head silhouettes count as blocked subject area.
+        5. Upper text is OK only if it does not touch any face, story evidence, or main action.
+        6. If using sky/background, keep the entire sticker box there; do not let its lower edge cover guards, stakes, enclosures, hands, animals, or other story objects.
+        7. Bottom text is OK only if the bottom area is open.
+        8. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
+        9. If a face/profile is in the top rows, do not choose an upper-center band.
+        10. If top or bottom would cover the subject or story evidence, use side or corner open space.
+        11. Keep overlay_text short, usually 3 to 6 words. For sticker text longer than five words, use two or three lines.
+        12. If a corner or side sticker would need four text lines, shorten overlay_text to 3 to 5 words instead of accepting a tall block.
 
         Tool-call rules:
         - When tool use is available, do not return the overlay copy as plain text.
@@ -1179,6 +1186,7 @@ enum ProductionPrompts {
         - asset_id must be exactly one listed or returned ID such as asset_1 or rendered_2; never include overlay_text or punctuation in asset_id.
         - After add_text_overlay succeeds, call accept_overlay_layout on the returned rendered asset_id unless the layout clearly needs a move_text_overlay correction.
         - Keep overlay_text compact. For more than five words, request two lines.
+        - If the clean placement would require a tall text wall, shorten overlay_text instead of accepting an oversized stack.
         - No hashtags unless clearly supported by the story.
         - No emojis unless clearly supported by the story.
         """

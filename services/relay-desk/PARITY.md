@@ -69,13 +69,21 @@ Field Mode parity.
   shape is a bug because it distorts subjects and invalidates placement tests.
 - Relay Desk should treat complete `x`, `y`, `width`, and `height` overlay
   arguments as an explicit slot even when the model also emits stale normalized
-  hints. Partial rectangle follow-ups should preserve the prior explicit slot.
-- The Relay correction pass may attach a temporary coordinate-grid preview to
-  help small VLMs reason about open regions. The grid is not part of the final
-  rendered output.
+  hints. Partial rectangle follow-ups are rejected so the correction stage does
+  not silently preserve a bad prior slot.
+- The Relay correction pass attaches a temporary coordinate scaffold with
+  coarse A1-F6 cells and pixel anchor dots so the VLM can judge the rendered
+  image and choose its own correction rectangle. The scaffold is not part of
+  the final rendered output and is not a deterministic placement scorer.
+- Relay batch runs enable Gemma thinking by default and persist raw responses
+  plus extracted thought traces so prompt failures can be diagnosed from the
+  model's own correction-stage reasoning.
 - Relay Desk rejects malformed correction moves that provide only part of an
   explicit rectangle, and it rejects wide upper-row correction banners. Those
   validation errors are fed back to Gemma so the correction stage can retry with
-  complete coordinates in a safer slot.
+  complete coordinates in a safer slot. Accept prompts are intentionally strict:
+  close calls should move rather than approving a previous draft placement.
+- Relay rendering must never silently drop overlay words to satisfy a requested
+  line count; full text visibility is a correction-stage accept criterion.
 - Full Gemma overlay pre-analysis can be added later by porting
   `submit_overlay_layout_guide` and the `OverlayLayoutGuidance` addendum.

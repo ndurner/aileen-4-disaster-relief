@@ -282,8 +282,9 @@ actor GemmaToolCallingEngine {
         Continue the same rendered-overlay review from this updated frame.
         The attached image is the current rendered state for asset_id \(renderedAssetID).
         Judge the actual pixels in this attached image.
-        If the current label is now publishable, stop without another tool call or use accept_overlay_layout if available.
-        If the label still clearly needs a material placement or style improvement, call move_text_overlay on asset_id \(renderedAssetID).
+        If the current label is excellent and production-ready, stop without another tool call or use accept_overlay_layout if available.
+        If this is a close call, do not accept it.
+        If the label still clearly needs a material placement or style improvement, choose a clean open rectangle yourself and call move_text_overlay on asset_id \(renderedAssetID) with x, y, width, and height.
         """
 
         return try ProductionToolSchema.toolResponseAndUserMessageJSON(
@@ -355,7 +356,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "add_text_overlay",
-          "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not directly across the subject's face, body, hands, animal body, tool interaction, or main silhouette. Actively look for empty space before choosing a default band: check top sky, side margins, corners, open ground, water, wall, and plain background. Prefer open space over subject-obscuring placement. Do not treat the bottom as automatically safe: if an animal, hands, tools, or the main action sits near the lower edge, choose upper, side, or corner space instead. Upper placements are allowed when they feel modern and do not visibly cover the face or central action, but compare them against lower, side, and corner options first. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. Prefer exact x, y, width, and height when choosing side or corner open space. If you provide x, y, width, and height, the renderer treats that rectangle as an available slot in the rendered frame. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
+          "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not directly across the subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. Actively look for empty space before choosing a default band: check top sky, side margins, corners, open ground, water, wall, and plain background. Prefer open space over subject-obscuring placement. Do not treat a dark shirt, hair, shoulder, story evidence, or plain-looking body area as empty space. Do not treat the bottom as automatically safe: if an animal, hands, tools, story evidence, or the main action sits near the lower edge, choose upper, side, or corner space instead. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action, but compare them against lower, side, and corner options first. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. Prefer exact x, y, width, and height when choosing side or corner open space. If you provide x, y, width, and height, the renderer treats that rectangle as an available slot in the rendered frame. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -389,7 +390,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "move_text_overlay",
-          "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay is close but needs a material placement or style change. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from direct subject obstruction rather than closer to it. Prefer free space and frame edges over subject-obscuring placement. Bottom is not automatically safe; move away from the bottom when the lower area contains an animal, hands, tools, or the main action. Upper placements are allowed when they feel modern and do not visibly cover the face or central action. Prefer exact x, y, width, and height when moving into side or corner open space. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
+          "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay is close but needs a material placement or style change. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from direct subject obstruction rather than closer to it. Prefer free space and frame edges over subject-obscuring placement. The sticker background counts as overlay area. Do not place it across face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. Do not treat dark clothing, hair, shoulders, story evidence, or plain-looking body areas as empty space. Bottom is not automatically safe; move away from the bottom when the lower area contains an animal, hands, tools, story evidence, or the main action. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action. In correction review, choose your own exact open rectangle. Prefer exact x, y, width, and height when moving into open space. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -423,7 +424,7 @@ enum ProductionToolSchema {
         "type": "function",
         "function": {
           "name": "accept_overlay_layout",
-          "description": "Explicitly mark the current rendered asset as visually acceptable with no further overlay movement needed. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas or other arguments inside asset_id.",
+          "description": "Explicitly mark the current rendered asset as visually acceptable with no further overlay movement needed. Use this only when the rendered label is excellent as-is, not merely tolerable or familiar from the previous step. If this is a close call or a clearer open-space placement exists, use move_text_overlay instead. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas or other arguments inside asset_id.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -537,7 +538,7 @@ private enum ReviewToolSchema {
         "type": "function",
         "function": {
           "name": "move_text_overlay",
-          "description": "Revise the current overlay on the rendered asset when the placement should materially change.",
+          "description": "Revise the current overlay on the rendered asset when the placement should materially change. For correction, prefer exact x, y, width, and height in the 1080x1350 image.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -576,7 +577,7 @@ private enum ReviewToolSchema {
         "type": "function",
         "function": {
           "name": "accept_overlay_layout",
-          "description": "Accept the current rendered overlay layout with no further changes.",
+          "description": "Accept the current rendered overlay layout with no further changes. Use this only when the label is excellent as-is, not merely tolerable. If this is a close call or a clearer open-space placement exists, use move_text_overlay instead.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -597,7 +598,7 @@ private enum ReviewToolSchema {
             "type": "function",
             "function": {
               "name": "move_text_overlay",
-              "description": "Revise the current overlay on the rendered asset when the placement should materially change.",
+              "description": "Revise the current overlay on the rendered asset when the placement should materially change. For correction, prefer exact x, y, width, and height in the 1080x1350 image.",
               "parameters": {
                 "type": "object",
                 "properties": {
@@ -631,7 +632,7 @@ private enum ReviewToolSchema {
             "type": "function",
             "function": {
               "name": "accept_overlay_layout",
-              "description": "Accept the current rendered overlay layout with no further changes.",
+              "description": "Accept the current rendered overlay layout with no further changes. Use this only when the label is excellent as-is, not merely tolerable. If this is a close call or a clearer open-space placement exists, use move_text_overlay instead.",
               "parameters": {
                 "type": "object",
                 "properties": {
@@ -652,7 +653,8 @@ private enum ReviewToolSchema {
             Judge the actual pixels in the attached image, not the prior reasoning.
             Prior user text, prior model text, and prior tool choices are context only and must not justify a weak placement.
             Use move_text_overlay only when you can clearly improve placement or style.
-            Use accept_overlay_layout only when the current drawn label is already publishable as-is.
+            Use accept_overlay_layout only when the current drawn label is excellent as-is.
+            Close calls should move, not be accepted.
             """
             : """
             You are reviewing a rendered social-media image that already has one drawn text label.
@@ -675,24 +677,42 @@ private enum ReviewToolSchema {
             "Your job is to judge that drawn label, not to imagine a new blank image.",
             "Look only at the single attached image and decide whether the current drawn label should stay where it is or be moved.",
             "Do not defend the earlier choice just because it already exists.",
-            "Treat a label that sits directly across the subject's face, body, hands, animal body, tool interaction, or main silhouette as a strong reason to move it.",
-            "Faces are blocked, including side-profile faces and faces partly cropped by the image edge.",
+            "The earlier placement is only a draft. Do not approve it just because it already exists.",
+            "Close call means move. Accept only when you would hand off the image unchanged for production.",
+            "If any word from the intended overlay text is missing or truncated, move or resize the label; do not accept it.",
+            "If the clean placement would make a tall text wall, shorten overlay_text and keep the same meaning.",
+            "If a corner or side label needs four lines or feels like a tall block, shorten overlay_text and keep the same meaning.",
+            "Judge the whole sticker box, not just the black text letters.",
+            "Check the top edge, bottom edge, left edge, and right edge of the box.",
+            "Use the 1080x1350 pixel coordinate system: x grows left to right, y grows top to bottom.",
+            "If moving, choose your own clean open rectangle, then call move_text_overlay with all four integers: x, y, width, height.",
+            "Do not use top_fraction or anchors for a correction move when exact coordinates are possible.",
+            "Treat a label or sticker background that sits directly across the subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette as a strong reason to move it.",
+            "Story evidence is the visible thing that explains the update: plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, damage, or similar evidence.",
+            "Plant guards and vertical stakes are not empty background, even if the text itself is above them.",
+            "For scenic images, do not cover the most distinctive sunset, horizon, skyline, smoke, water, cloud, fire, or damage band; use quieter negative space around it.",
+            "If the current label touches the red/orange/yellow sunset band while darker quiet sky is available above, move it upward or sideways with exact coordinates.",
+            "Faces, heads, hair, shoulders, and torsos are blocked, including side-profile faces and faces partly cropped by the image edge.",
+            "Dark clothing, hair, shoulders, and story evidence are not empty space.",
             "Moving away from one subject is not enough if the new label covers another subject.",
-            "Upper placements can be acceptable only when they do not touch any face or central action.",
+            "Upper placements can be acceptable only when the whole sticker background avoids every face, head, hair, shoulder, torso, story evidence, and central action.",
             "If a face or profile appears in the upper rows, do not use an upper-center band.",
             "For animal-care scenes with a person on one side and an animal low in frame, prefer compact open middle background between them.",
-            "Bottom placements can be acceptable only when the lower area is open; do not cover an animal, hands, tools, or lower action.",
+            "Open middle grass or plain background can be a better handoff-quality choice than a top label.",
+            "Bottom placements can be acceptable only when the lower area is open; do not cover an animal, hands, tools, story evidence, or lower action.",
             "A large centered band can still be a bad choice if clear side or corner space is available.",
-            "If the text box clearly obscures the subject or competes with the main story evidence, move it.",
+            "If the text box or sticker background clearly obscures the subject or competes with story evidence, move it.",
+            "If the text box cuts off or drops words from the overlay text, move it to a larger rectangle or use more lines.",
+            "If a short side/corner slot is best, you may shorten overlay_text instead of forcing a large stack.",
             "Move means replace the current text label with a better placement on the same image.",
-            "Prefer a surprising but plausible modern placement over a boring banner, but do not rationalize obvious face, body, hand, animal, tool, or evidence overlap.",
+            "Prefer a surprising but plausible modern placement over a boring banner, but do not rationalize obvious face, body, hand, animal, tool, story-evidence, or evidence overlap.",
             "Use asset_id \(renderedAssetID)."
         ]
         if mode.allowsAccept {
             lines.insert("Use exactly one tool call before you stop:", at: 4)
-            lines.insert("- call accept_overlay_layout only if the current drawn text label is already in a good place and should remain exactly where it is", at: 5)
+            lines.insert("- call accept_overlay_layout only if the current drawn text label is excellent and should remain exactly where it is", at: 5)
             lines.insert("- call move_text_overlay if the current drawn text label should shift position, change size band, or change style", at: 6)
-            lines.insert("Accept means leave the current text label exactly where it is with no change.", at: 9)
+            lines.insert("Accept means production-ready with no change; it does not mean merely acceptable.", at: 9)
         } else {
             lines.insert("You have only one tool: move_text_overlay.", at: 4)
             lines.insert("Use move_text_overlay only if you can make a clear improvement.", at: 5)

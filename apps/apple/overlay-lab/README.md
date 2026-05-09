@@ -78,6 +78,17 @@ apps/apple/overlay-lab/scripts/run_gemma_overlay_lab.sh /tmp/test-imgs/*
 ```
 
 Outputs are written to `/tmp/aileen-overlay-lab` or `/tmp/aileen-gemma-overlay-runs` unless overridden by environment variables in the scripts.
+For production-parity prompts, place a same-stem `.txt` file next to each
+image; the simulator lab stages it as the UI "Story prompt" field. A same-stem
+`.briefing.txt`, directory-level `background_briefing.txt`, directory-level
+`briefing.txt`, or `AILEEN_GEMMA_BACKGROUND` supplies the UI background
+briefing. If no briefing is provided, the field is intentionally blank.
+The simulator lab forwards LiteRT bridge overrides such as
+`GEMMA_LITERT_MAX_NUM_TOKENS`, `GEMMA_LITERT_MAX_OUTPUT_TOKENS`, backend
+selection, constrained decoding, and bridge debug logging into the launched app
+process. The app defaults to an 8192-token LiteRT engine budget and a
+1200-token output cap so thinking-mode generations have enough room to reach
+tool calls without sprawling indefinitely.
 
 The quality harness can also delegate to this simulator path:
 
@@ -100,5 +111,11 @@ services/relay-desk/.venv/bin/python \
 ```
 
 This uses `services/relay-desk/relay_batch.py`, which imports the same Relay Desk production workflow used by Gradio. The Hugging Face model is lazy-loaded only when generation starts, so the batch runner can be imported and dry-run without paying model startup cost.
+Relay batch runs enable Gemma thinking by default and write `raw_responses`,
+`thought_traces`, and `thinking_enabled` into `results.jsonl` for correction
+stage debugging. Set `AILEEN_RELAY_ENABLE_THINKING=0` only when comparing
+against the no-thinking behavior. Thinking runs default to
+`AILEEN_RELAY_MAX_NEW_TOKENS=1200` to reduce local MPS memory pressure; override
+that only when diagnosing truncated thoughts or tool calls.
 
 For wiring checks that should not load Gemma, add `--relay-dry-run`.

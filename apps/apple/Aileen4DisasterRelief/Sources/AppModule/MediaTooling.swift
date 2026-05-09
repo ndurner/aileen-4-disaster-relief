@@ -442,6 +442,19 @@ final class AppleMediaTooling: @unchecked Sendable {
         guard let previousOverlay = currentAsset.latestOverlayRequest else {
             throw MediaToolingError.invalidArguments("move_text_overlay requires an asset with an existing overlay.")
         }
+        if let partialRectError = Self.partialExplicitRectError(arguments) {
+            return MediaToolResult(
+                name: "move_text_overlay",
+                payload: [
+                    "status": "invalid_partial_rect",
+                    "asset_id": currentAsset.toolID,
+                    "accepted": false,
+                    "error": partialRectError,
+                    "required_coordinates": ["x", "y", "width", "height"]
+                ],
+                outputURL: currentAsset.url
+            )
+        }
         let baseAssetID = currentAsset.baseAssetID ?? assetID
         let baseAsset = try resolveAsset(baseAssetID)
         let requestedOverlay = try overlayRequest(
@@ -716,19 +729,16 @@ final class AppleMediaTooling: @unchecked Sendable {
         let explicitRectFields = ["x", "y", "width", "height"]
         let hasNormalizedOverride = arguments["top_fraction"] != nil || arguments["max_width_fraction"] != nil || arguments["target_line_count"] != nil
         let providedExplicitRectFields = Set(explicitRectFields.filter { arguments[$0] != nil })
-        let hasExplicitRectOverride = !providedExplicitRectFields.isEmpty
         let hasCompleteExplicitRectOverride = providedExplicitRectFields.count == explicitRectFields.count
-        let canReusePriorRect = previous?.rect.width ?? 0 > 0 && previous?.rect.height ?? 0 > 0
-        let shouldUseExplicitRect = hasCompleteExplicitRectOverride || (hasExplicitRectOverride && canReusePriorRect)
+        let shouldUseExplicitRect = hasCompleteExplicitRectOverride
 
         let rect: CGRect
         if shouldUseExplicitRect {
-            let priorRect = previous?.rect ?? .zero
             rect = CGRect(
-                x: arguments["x"]?.numberValue ?? priorRect.minX,
-                y: arguments["y"]?.numberValue ?? priorRect.minY,
-                width: arguments["width"]?.numberValue ?? priorRect.width,
-                height: arguments["height"]?.numberValue ?? priorRect.height
+                x: arguments["x"]?.numberValue ?? 0,
+                y: arguments["y"]?.numberValue ?? 0,
+                width: arguments["width"]?.numberValue ?? 0,
+                height: arguments["height"]?.numberValue ?? 0
             )
         } else if hasNormalizedOverride {
             rect = .zero
@@ -754,6 +764,16 @@ final class AppleMediaTooling: @unchecked Sendable {
             horizontalAnchor: horizontalAnchor,
             verticalAnchor: verticalAnchor
         )
+    }
+
+    private static func partialExplicitRectError(_ arguments: [String: LiteRTToolValue]) -> String? {
+        let explicitRectFields = ["x", "y", "width", "height"]
+        let providedFields = explicitRectFields.filter { arguments[$0] != nil }
+        guard !providedFields.isEmpty, providedFields.count != explicitRectFields.count else {
+            return nil
+        }
+        let missingFields = explicitRectFields.filter { arguments[$0] == nil }
+        return "Partial rectangle provided. Missing: \(missingFields.joined(separator: ", "))."
     }
 
     private func protectedRegions(for asset: RenderedAsset) throws -> OverlayProtectedRegions {

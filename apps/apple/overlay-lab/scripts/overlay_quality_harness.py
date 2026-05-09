@@ -15,8 +15,8 @@ from typing import Any
 
 try:
     from PIL import Image, ImageDraw, ImageFont, ImageOps
-except ImportError as exc:
-    raise SystemExit("Pillow is required. Install it with: python3 -m pip install Pillow") from exc
+except ImportError:
+    Image = ImageDraw = ImageFont = ImageOps = None  # type: ignore[assignment]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -318,7 +318,13 @@ def render_swift(case: HarnessCase, strategy: OverlayStrategy, output_dir: Path)
     return output_path, frame, style
 
 
+def require_pillow() -> None:
+    if Image is None or ImageDraw is None or ImageFont is None or ImageOps is None:
+        raise SystemExit("Pillow is required for fixture rendering. Install it with: python3 -m pip install Pillow")
+
+
 def render_relay(case: HarnessCase, strategy: OverlayStrategy, output_dir: Path) -> tuple[Path, tuple[int, int, int, int], str]:
+    require_pillow()
     source = ImageOps.exif_transpose(Image.open(case.image_path)).convert("RGB")
     canvas = aspect_fill(source, CANVAS_SIZE)
     draw = ImageDraw.Draw(canvas, "RGBA")
@@ -473,8 +479,15 @@ Return only JSON matching the supplied schema.
 def run_litert_ios(cases: list[HarnessCase], run_dir: Path, timeout_seconds: int) -> None:
     input_dir = run_dir / "litert-inputs"
     input_dir.mkdir()
+    for briefing_name in ("background_briefing.txt", "briefing.txt"):
+        briefing_path = cases[0].image_path.parent / briefing_name if cases else None
+        if briefing_path and briefing_path.exists():
+            shutil.copy2(briefing_path, input_dir / briefing_name)
+            break
     for case in cases:
         shutil.copy2(case.image_path, input_dir / case.image_path.name)
+        if case.story_path:
+            shutil.copy2(case.story_path, input_dir / f"{case.image_path.stem}.txt")
     env = os.environ.copy()
     env["AILEEN_GEMMA_LAB_OUT"] = str(run_dir / "litert-ios")
     env["AILEEN_GEMMA_LAB_TIMEOUT_SECONDS"] = str(timeout_seconds)

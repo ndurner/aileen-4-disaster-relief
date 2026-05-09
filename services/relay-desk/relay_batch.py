@@ -92,6 +92,9 @@ def run_case(case: dict[str, Any], output_root: Path, background: str, dry_run: 
         "output_path": "",
         "tool_calls": [],
         "tool_payloads": [],
+        "raw_responses": [],
+        "thought_traces": [],
+        "thinking_enabled": relay_app.ENABLE_THINKING,
         "error": "",
     }
     if dry_run:
@@ -117,6 +120,9 @@ def run_case(case: dict[str, Any], output_root: Path, background: str, dry_run: 
                 "output_path": str(produced_path),
                 "tool_calls": [asdict(call) for call in visual_result.tool_calls],
                 "tool_payloads": visual_result.tool_payloads,
+                "raw_responses": visual_result.raw_responses,
+                "thought_traces": visual_result.thought_traces,
+                "thinking_enabled": visual_result.thinking_enabled,
             }
         )
     except Exception as exc:

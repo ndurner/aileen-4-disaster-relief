@@ -292,7 +292,17 @@ Relay Desk is designed for a Hugging Face Gradio Space on ZeroGPU. It uses
 `google/gemma-4-E4B-it` through Transformers, renders the story image with
 Pillow, and does not call the Gemini API. Local Apple Silicon runs use PyTorch
 MPS automatically when available; set `AILEEN_RELAY_DEVICE=cpu`, `mps`, or
-`cuda` to override device selection.
+`cuda` to override device selection. Relay enables Gemma thinking by default
+for production and batch runs, captures raw model responses and extracted
+thinking traces in the batch harness, and uses `AILEEN_RELAY_ENABLE_THINKING=0`
+only for no-thinking comparisons. Thinking runs default to a bounded
+`AILEEN_RELAY_MAX_NEW_TOKENS=1200` generation cap to keep local MPS runs stable;
+raise it only when diagnosing truncated thoughts or tool calls.
+The Apple LiteRT-LM bridge uses the same 1200-token output cap by default and
+an 8192-token engine budget so thinking-mode prompts have room for image/tool
+context before the model emits tool calls. Override with
+`GEMMA_LITERT_MAX_OUTPUT_TOKENS` or `GEMMA_LITERT_MAX_NUM_TOKENS` when running
+targeted experiments.
 
 Restore Google AI Edge artifacts after a fresh clone:
 

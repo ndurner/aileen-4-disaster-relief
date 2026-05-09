@@ -38,12 +38,12 @@ bool DebugLoggingEnabled() {
 int ResolveMaxOutputTokens() {
   const char* override = std::getenv("GEMMA_LITERT_MAX_OUTPUT_TOKENS");
   if (override == nullptr || std::strlen(override) == 0) {
-    return 4000;
+    return 1200;
   }
   char* end = nullptr;
   const long parsed = std::strtol(override, &end, 10);
   if (end == override || parsed <= 0 || parsed > 8192) {
-    return 4000;
+    return 1200;
   }
   return static_cast<int>(parsed);
 }
@@ -51,12 +51,12 @@ int ResolveMaxOutputTokens() {
 int ResolveMaxNumTokens() {
   const char* override = std::getenv("GEMMA_LITERT_MAX_NUM_TOKENS");
   if (override == nullptr || std::strlen(override) == 0) {
-    return 4096;
+    return 8192;
   }
   char* end = nullptr;
   const long parsed = std::strtol(override, &end, 10);
   if (end == override || parsed <= 0 || parsed > 32768) {
-    return 4096;
+    return 8192;
   }
   return static_cast<int>(parsed);
 }
