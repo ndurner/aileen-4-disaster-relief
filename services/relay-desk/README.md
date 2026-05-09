@@ -26,6 +26,10 @@ It prepares:
 - post text
 - downloadable ZIP with `aileen-job.yaml` and produced media under `media/`
 
+When the package media provenance rolls up to `synthetic_demo_image`, Relay Desk
+stamps the finished story visual with the same small upper-left `AI` disclosure
+badge used by the iOS Field Mode renderer.
+
 The browser UI mirrors the iOS app's ocean-light production surface. Static UI
 artwork lives under `assets/` and is served with Gradio static paths; it is not
 part of the completed field package export.

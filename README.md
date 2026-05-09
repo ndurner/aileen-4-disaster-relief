@@ -196,6 +196,12 @@ coordinate, that coordinate is also carried into the YAML media entry. A bare
 C2PA manifest is not treated as synthetic because authenticity cameras can also
 write C2PA credentials.
 
+Finished Field Mode and Relay Desk media whose rolled-up `source_type` is
+`synthetic_demo_image` also receive a small visible `AI` disclosure badge in the
+upper-left corner after the model-produced overlay is rendered. The badge is
+deterministic provenance UI rather than model-generated overlay copy, so it does
+not change the visual tool contract or compete for lower-frame caption space.
+
 Current `aileen-job.yaml` schema:
 
 ```yaml

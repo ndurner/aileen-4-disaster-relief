@@ -1768,6 +1768,8 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
     has_overlay_action = any(call.name in {"add_text_overlay", "move_text_overlay"} for call in seen_calls)
     if not latest_output_path or not has_overlay_action:
         raise gr.Error("The run did not produce a finished visual with the required overlay.")
+    if produced_source_type(assets) == "synthetic_demo_image":
+        latest_output_path = render_synthetic_disclosure_badge(latest_output_path)
     return VisualWorkflowResult(produced_path=latest_output_path, tool_calls=seen_calls, tool_payloads=payloads)
 
 
@@ -1931,6 +1933,43 @@ def render_image_overlay(
     return str(output_path), frame, style
 
 
+def render_synthetic_disclosure_badge(image_path: str) -> str:
+    canvas = open_image(image_path)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    draw_synthetic_disclosure_badge(draw, canvas.size)
+    output_dir = Path(tempfile.mkdtemp(prefix="aileen-relay-disclosure-"))
+    output_path = output_dir / "rendered-disclosure.jpg"
+    canvas.save(output_path, quality=92)
+    return str(output_path)
+
+
+def draw_synthetic_disclosure_badge(draw: ImageDraw.ImageDraw, canvas_size: tuple[int, int]) -> None:
+    width, _height = canvas_size
+    font_size = int(max(24, min(34, width * 0.028)))
+    font = load_serif_display_font(font_size, bold=True, italic=True)
+    label = "AI"
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    diameter = int(max(text_width, text_height) + font_size * 0.58)
+    inset = int(max(22, width * 0.026))
+    x0 = inset
+    y0 = inset
+    x1 = x0 + diameter
+    y1 = y0 + diameter
+
+    shadow_offset = max(1, diameter // 22)
+    draw.ellipse(
+        (x0, y0 + shadow_offset, x1, y1 + shadow_offset),
+        fill=(0, 0, 0, 66),
+    )
+    draw.ellipse((x0, y0, x1, y1), fill=(0, 0, 0, 163))
+
+    text_x = x0 + (diameter - text_width) / 2 - bbox[0]
+    text_y = y0 + (diameter - text_height) / 2 - bbox[1]
+    draw.text((text_x, text_y), label, font=font, fill=(255, 255, 255, 245))
+
+
 def resolve_overlay_frame(
     draw: ImageDraw.ImageDraw,
     request: OverlayRequest,
@@ -2087,6 +2126,42 @@ def load_font(size: int, bold: bool):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/System/Library/Fonts/Supplemental/Georgia Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Georgia.ttf",
     ]
+    for path in font_candidates:
+        if Path(path).exists():
+            return ImageFont.truetype(path, size=size)
+    return ImageFont.load_default()
+
+
+def load_sans_font(size: int, bold: bool):
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ]
+    for path in font_candidates:
+        if Path(path).exists():
+            return ImageFont.truetype(path, size=size)
+    return ImageFont.load_default()
+
+
+def load_serif_display_font(size: int, bold: bool, italic: bool):
+    if bold and italic:
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-BoldItalic.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSerif-BoldItalic.ttf",
+            "/System/Library/Fonts/Supplemental/Georgia Bold Italic.ttf",
+            "/System/Library/Fonts/Supplemental/Times New Roman Bold Italic.ttf",
+        ]
+    else:
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf"
+            if bold
+            else "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+            "/System/Library/Fonts/Supplemental/Georgia Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Georgia.ttf",
+        ]
     for path in font_candidates:
         if Path(path).exists():
             return ImageFont.truetype(path, size=size)

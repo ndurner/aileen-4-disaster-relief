@@ -13,6 +13,204 @@ struct MediaToolResult {
     let outputURL: URL?
 }
 
+enum SyntheticMediaDisclosureRenderer {
+    private enum ImageFileType {
+        case png
+        case jpeg
+        case heic
+
+        var pathExtension: String {
+            switch self {
+            case .png:
+                return "png"
+            case .jpeg:
+                return "jpg"
+            case .heic:
+                return "heic"
+            }
+        }
+
+        var utType: UTType {
+            switch self {
+            case .png:
+                return .png
+            case .jpeg:
+                return .jpeg
+            case .heic:
+                return .heic
+            }
+        }
+    }
+
+    static func renderBadge(on url: URL) async throws -> URL {
+        switch MediaAsset.kind(for: url) {
+        case .image:
+            return try renderImageBadge(on: url)
+        case .movie:
+            return try await renderVideoBadge(on: url)
+        }
+    }
+
+    private static func renderImageBadge(on url: URL) throws -> URL {
+        guard let image = UIImage(contentsOfFile: url.path) else {
+            throw MediaToolingError.imageLoadFailed("Unable to load rendered image for synthetic disclosure.")
+        }
+
+        let fileType = imageFileType(for: url) ?? .jpeg
+        let canvasSize = image.size
+        let outputURL = outputURL(for: fileType.pathExtension)
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: rendererFormat())
+        let rendered = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: canvasSize))
+            drawBadge(in: context.cgContext, canvasSize: canvasSize)
+        }
+
+        try writeImage(rendered, to: outputURL, fileType: fileType)
+        return outputURL
+    }
+
+    private static func renderVideoBadge(on url: URL) async throws -> URL {
+        let asset = AVURLAsset(url: url)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            throw MediaToolingError.videoTrackMissing("No video track found for synthetic disclosure.")
+        }
+
+        let rect = CGRect(origin: .zero, size: videoTrack.naturalSize).applying(videoTrack.preferredTransform)
+        let canvasSize = CGSize(width: abs(rect.width), height: abs(rect.height))
+        guard let badgeCGImage = badgeImage(canvasSize: canvasSize) else {
+            throw MediaToolingError.imageLoadFailed("Unable to render synthetic disclosure badge.")
+        }
+        let badgeImage = CIImage(cgImage: badgeCGImage)
+        let videoComposition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
+            let compositedImage = badgeImage
+                .composited(over: request.sourceImage)
+                .cropped(to: request.sourceImage.extent)
+            request.finish(with: compositedImage, context: nil)
+        })
+
+        let outputURL = outputURL(for: "mp4")
+        try await exportVideo(asset: asset, videoComposition: videoComposition, outputURL: outputURL)
+        return outputURL
+    }
+
+    private static func badgeImage(canvasSize: CGSize) -> CGImage? {
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: rendererFormat())
+        return renderer.image { context in
+            drawBadge(in: context.cgContext, canvasSize: canvasSize)
+        }.cgImage
+    }
+
+    private static func drawBadge(in context: CGContext, canvasSize: CGSize) {
+        let fontSize = max(24, min(34, canvasSize.width * 0.028))
+        let font = UIFont(name: "Georgia-BoldItalic", size: fontSize)
+            ?? UIFont(name: "TimesNewRomanPS-BoldItalicMT", size: fontSize)
+            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white.withAlphaComponent(0.96),
+            .kern: 0.4,
+            .paragraphStyle: paragraph
+        ]
+        let text = "AI" as NSString
+        let textSize = text.size(withAttributes: attributes)
+        let diameter = ceil(max(textSize.width, textSize.height) + fontSize * 0.58)
+        let inset = max(22, canvasSize.width * 0.026)
+        let rect = CGRect(x: inset, y: inset, width: diameter, height: diameter)
+
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 5, color: UIColor.black.withAlphaComponent(0.26).cgColor)
+        UIColor.black.withAlphaComponent(0.64).setFill()
+        context.fillEllipse(in: rect)
+        context.restoreGState()
+
+        let textRect = CGRect(
+            x: rect.minX,
+            y: rect.midY - textSize.height / 2,
+            width: rect.width,
+            height: textSize.height
+        )
+        text.draw(in: textRect, withAttributes: attributes)
+    }
+
+    private static func writeImage(_ image: UIImage, to outputURL: URL, fileType: ImageFileType) throws {
+        guard let cgImage = image.cgImage else {
+            throw MediaToolingError.imageLoadFailed("Unable to encode synthetic disclosure image.")
+        }
+        guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, fileType.utType.identifier as CFString, 1, nil) else {
+            throw MediaToolingError.imageLoadFailed("Unable to create synthetic disclosure image destination.")
+        }
+
+        let options: CFDictionary?
+        switch fileType {
+        case .png:
+            options = nil
+        case .jpeg, .heic:
+            options = [kCGImageDestinationLossyCompressionQuality: 0.92] as CFDictionary
+        }
+
+        CGImageDestinationAddImage(destination, cgImage, options)
+        guard CGImageDestinationFinalize(destination) else {
+            throw MediaToolingError.imageLoadFailed("Unable to encode synthetic disclosure image.")
+        }
+    }
+
+    private static func exportVideo(asset: AVAsset, videoComposition: AVVideoComposition, outputURL: URL) async throws {
+        guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+            throw MediaToolingError.exportFailed("Unable to create AVAssetExportSession for synthetic disclosure.")
+        }
+
+        exporter.outputURL = outputURL
+        exporter.outputFileType = .mp4
+        exporter.shouldOptimizeForNetworkUse = true
+        exporter.videoComposition = videoComposition
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            exporter.exportAsynchronously {
+                switch exporter.status {
+                case .completed:
+                    continuation.resume(returning: ())
+                case .failed, .cancelled:
+                    let message = exporter.error?.localizedDescription ?? "Export failed."
+                    continuation.resume(throwing: MediaToolingError.exportFailed(message))
+                default:
+                    continuation.resume(throwing: MediaToolingError.exportFailed("Export finished in unexpected state \(exporter.status.rawValue)."))
+                }
+            }
+        }
+    }
+
+    private static func outputURL(for pathExtension: String) -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AileenOutputs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(UUID().uuidString).appendingPathExtension(pathExtension)
+    }
+
+    private static func rendererFormat() -> UIGraphicsImageRendererFormat {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        return format
+    }
+
+    private static func imageFileType(for url: URL) -> ImageFileType? {
+        guard let type = UTType(filenameExtension: url.pathExtension) else {
+            return nil
+        }
+        if type.conforms(to: .png) {
+            return .png
+        }
+        if type.conforms(to: .heic) {
+            return .heic
+        }
+        if type.conforms(to: .jpeg) {
+            return .jpeg
+        }
+        return nil
+    }
+}
+
 enum MediaToolingError: LocalizedError {
     case unsupportedTool(String)
     case invalidArguments(String)

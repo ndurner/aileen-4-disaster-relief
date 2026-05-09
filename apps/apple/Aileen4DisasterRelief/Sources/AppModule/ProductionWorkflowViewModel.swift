@@ -341,6 +341,20 @@ final class ProductionWorkflowViewModel: ObservableObject {
         return "unknown"
     }
 
+    private func applySyntheticDisclosureBadgeIfNeeded(to urls: [URL]) async throws -> [URL] {
+        guard packageSourceTypeForProducedMedia() == "synthetic_demo_image" else {
+            return urls
+        }
+
+        currentStatusDetail = "Adding synthetic media disclosure"
+        var renderedURLs: [URL] = []
+        for url in urls {
+            try Task.checkCancellation()
+            renderedURLs.append(try await SyntheticMediaDisclosureRenderer.renderBadge(on: url))
+        }
+        return renderedURLs
+    }
+
     private func sourceGPSCoordinateForProducedMedia() -> AileenGPSCoordinate? {
         let coordinates = assets.compactMap { GPSMetadataReader.coordinate(for: $0) }
         guard let first = coordinates.first else {
@@ -607,7 +621,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
             throw GemmaTextRunnerError.runtime("Gemma did not produce a finished visual with the required overlay.")
         }
 
-        producedURLs = toolResult.producedURLs
+        producedURLs = try await applySyntheticDisclosureBadgeIfNeeded(to: toolResult.producedURLs)
         shareItems = producedURLs
 
         let textAvailability = locator.resolve(inference.onDeviceTextModel)
@@ -700,7 +714,7 @@ final class ProductionWorkflowViewModel: ObservableObject {
             throw GemmaTextRunnerError.runtime("Gemma did not produce a finished visual with the required overlay.")
         }
 
-        producedURLs = toolResult.producedURLs
+        producedURLs = try await applySyntheticDisclosureBadgeIfNeeded(to: toolResult.producedURLs)
         shareItems = producedURLs
 
         let postBodyPrompt = ProductionPrompts.postBodyPrompt(

@@ -19,6 +19,8 @@ Current focus:
 - shareable packages containing raw story inputs, media manifests, pre-render
   provenance, GPS metadata, and either generated Field Mode outputs or
   unprocessed Desk Mode media
+- a deterministic upper-left `AI` disclosure badge on finished Field Mode media
+  when source provenance rolls up to `synthetic_demo_image`
 
 Open the Xcode project:
 
@@ -49,7 +51,9 @@ Apple-specific support files live alongside the app:
 Field Mode generates here. It runs Gemma 4 on device through LiteRT-LM or in the
 cloud through the Gemini API, then exports `aileen-job.yaml` with
 `execution.mode: field_completed`, generated `story.post_body`, and finished
-media.
+media. If the source media is classified as `synthetic_demo_image`, the app
+stamps the finished image or reel with a small upper-left `AI` disclosure badge
+after the production overlay is rendered.
 
 Desk Mode generates later. It skips Gemma 4, exports `aileen-job.yaml` with
 `execution.mode: remote_generate`, keeps the user prompt in `story.raw`, omits
