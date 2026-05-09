@@ -719,7 +719,7 @@ final class AppleMediaTooling: @unchecked Sendable {
         let hasExplicitRectOverride = !providedExplicitRectFields.isEmpty
         let hasCompleteExplicitRectOverride = providedExplicitRectFields.count == explicitRectFields.count
         let canReusePriorRect = previous?.rect.width ?? 0 > 0 && previous?.rect.height ?? 0 > 0
-        let shouldUseExplicitRect = !hasNormalizedOverride && (hasCompleteExplicitRectOverride || (hasExplicitRectOverride && canReusePriorRect))
+        let shouldUseExplicitRect = hasCompleteExplicitRectOverride || (hasExplicitRectOverride && canReusePriorRect)
 
         let rect: CGRect
         if shouldUseExplicitRect {

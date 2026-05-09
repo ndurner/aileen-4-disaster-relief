@@ -67,5 +67,15 @@ Field Mode parity.
 - Relay Desk must aspect-fill source still images into the `1080 x 1350`
   canvas before drawing overlays. Directly resizing source photos to the canvas
   shape is a bug because it distorts subjects and invalidates placement tests.
+- Relay Desk should treat complete `x`, `y`, `width`, and `height` overlay
+  arguments as an explicit slot even when the model also emits stale normalized
+  hints. Partial rectangle follow-ups should preserve the prior explicit slot.
+- The Relay correction pass may attach a temporary coordinate-grid preview to
+  help small VLMs reason about open regions. The grid is not part of the final
+  rendered output.
+- Relay Desk rejects malformed correction moves that provide only part of an
+  explicit rectangle, and it rejects wide upper-row correction banners. Those
+  validation errors are fed back to Gemma so the correction stage can retry with
+  complete coordinates in a safer slot.
 - Full Gemma overlay pre-analysis can be added later by porting
   `submit_overlay_layout_guide` and the `OverlayLayoutGuidance` addendum.

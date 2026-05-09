@@ -4,7 +4,6 @@ import mimetypes
 import os
 import re
 import tempfile
-import textwrap
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -801,8 +800,15 @@ Tool workflow:
 
 Placement policy:
 - Base placement on the source or rendered frame supplied in the current turn.
-- Prefer one compact sticker-style overlay in available free space.
-- Avoid placing text on or tight against the main subject's face, body, or primary silhouette.
+- Before choosing a placement, identify the main visible subject, faces/heads, hands doing work, animals, tools, and the central story evidence.
+- Prefer one compact sticker-style overlay in available free space, including upper, lower, side, or corner space when it is visually defensible.
+- Actively look for empty space before choosing a default band. Check top sky, side margins, corners, open ground, water, wall, and plain background.
+- Do not use a large centered band when a smaller side or corner sticker would fit clear empty space.
+- Avoid placing text directly across the main subject's face, body, hands, animal body, tool interaction, or primary silhouette.
+- Any human face, head, or profile is blocked, even when it is partly cropped at the image edge.
+- Upper placements are allowed when they feel modern and do not visibly cover the face or central action. If any face or profile appears in the upper rows, do not use an upper-center sticker.
+- For animal-care scenes with a person on one side and an animal low in frame, prefer a compact side sticker in the open middle background between them.
+- Lower placements are allowed only when the lower area is genuinely open. Do not put a bottom sticker over an animal, hands, tools, or the lower half of the main action.
 - Keep the composition readable and visually balanced.
 
 Output behavior:
@@ -867,7 +873,7 @@ PRODUCTION_TOOLS = [
         "type": "function",
         "function": {
             "name": "add_text_overlay",
-            "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not near the subject's face, body, or main silhouette. Prefer empty sky, water, pavement, wall area, or a clean frame edge over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. If you use normalized placement, do not also guess raw x, y, width, or height. If you provide x, y, width, and height together with anchors, the renderer treats that rectangle as an available slot in the rendered frame rather than as the exact final text box. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
+            "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not directly across the subject's face, body, hands, animal body, tool interaction, or main silhouette. Actively look for empty space before choosing a default band: check top sky, side margins, corners, open ground, water, wall, and plain background. Prefer open space over subject-obscuring placement. Do not treat the bottom as automatically safe: if an animal, hands, tools, or the main action sits near the lower edge, choose upper, side, or corner space instead. Upper placements are allowed when they feel modern and do not visibly cover the face or central action, but compare them against lower, side, and corner options first. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. Prefer exact x, y, width, and height when choosing side or corner open space. If you provide x, y, width, and height, the renderer treats that rectangle as an available slot in the rendered frame. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -892,7 +898,7 @@ PRODUCTION_TOOLS = [
         "type": "function",
         "function": {
             "name": "move_text_overlay",
-            "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay is close but needs a material placement or style change. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from the subject rather than closer to it. Prefer free space and frame edges over subject-hugging placement. For close-up central subjects with limited negative space, prefer one lower sticker band rather than an upper sticker. In normalized mode, do not also guess raw x, y, width, or height. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
+            "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay needs a material placement or style change, and always use it when the current label sits directly across a face, body, hands, animal body, tool interaction, or main silhouette. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from direct subject obstruction rather than closer to it. Prefer free space and frame edges over subject-obscuring placement. Bottom is not automatically safe; move away from the bottom when the lower area contains an animal, hands, tools, or the main action. Upper placements are allowed when they feel modern and do not visibly cover the face or central action. Prefer exact x, y, width, and height when moving into side or corner open space. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1207,12 +1213,24 @@ Create one short Instagram-style overlay line for the attached media.
 {valid_source_ids or "(none selected)"}
 </valid_source_asset_ids>
 
+Placement checklist:
+1. Find faces, animals, hands, tools, and the main story evidence.
+2. Find empty space: sky, wall, water, open ground, side margin, or corner.
+3. Do not put the text box directly across faces, bodies, animals, hands, tools, or action.
+4. Edge faces and profile faces count as faces.
+5. Upper text is OK only if it does not touch any face or main action.
+6. Bottom text is OK only if the bottom area is open.
+7. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
+8. If a face/profile is in the top rows, do not choose an upper-center band.
+9. If top or bottom would cover the subject, use side or corner open space.
+10. For sticker text longer than five words, use two or three lines.
+
 Tool-call rules:
 - When tool use is available, do not return the overlay copy as plain text.
 - For a single source asset, call add_text_overlay directly on that asset_id with one compact overlay_text.
 - asset_id must be exactly one listed or returned ID such as asset_1 or rendered_2; never include overlay_text or punctuation in asset_id.
 - After add_text_overlay succeeds, call accept_overlay_layout on the returned rendered asset_id unless the layout clearly needs a move_text_overlay correction.
-- Keep overlay_text to one short line.
+- Keep overlay_text compact. For more than five words, request two lines.
 - No hashtags unless clearly supported by the story.
 - No emojis unless clearly supported by the story.
 """.strip()
@@ -1567,6 +1585,7 @@ class RelayMediaTooling:
             )
             for asset in source_assets
         }
+        self.assets_with_rejected_partial_rect: set[str] = set()
         self.next_rendered_asset_index = 1
 
     def execute(self, tool_call: ToolCall) -> MediaToolResult:
@@ -1618,6 +1637,34 @@ class RelayMediaTooling:
         current_asset = self.resolve_asset(asset_id)
         if current_asset.latest_overlay_request is None:
             raise gr.Error("move_text_overlay requires an asset with an existing overlay.")
+        partial_rect_error = partial_explicit_rect_error(arguments)
+        if partial_rect_error and not current_asset.latest_overlay_request.rect:
+            self.assets_with_rejected_partial_rect.add(current_asset.tool_id)
+            return MediaToolResult(
+                name="move_text_overlay",
+                payload={
+                    "status": "invalid_partial_rect",
+                    "asset_id": current_asset.tool_id,
+                    "accepted": False,
+                    "error": partial_rect_error,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                },
+                output_path=current_asset.path,
+            )
+        upper_retry_error = upper_row_retry_error(arguments, current_asset.tool_id in self.assets_with_rejected_partial_rect)
+        upper_move_error = upper_row_move_error(arguments)
+        if upper_retry_error or upper_move_error:
+            return MediaToolResult(
+                name="move_text_overlay",
+                payload={
+                    "status": "invalid_upper_retry" if upper_retry_error else "invalid_upper_move",
+                    "asset_id": current_asset.tool_id,
+                    "accepted": False,
+                    "error": upper_retry_error or upper_move_error,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                },
+                output_path=current_asset.path,
+            )
         base_asset_id = current_asset.base_asset_id or asset_id
         base_asset = self.resolve_asset(base_asset_id)
         request = overlay_request_from_arguments(
@@ -1625,6 +1672,7 @@ class RelayMediaTooling:
             defaulting_to=current_asset.latest_overlay_request,
             require_text=False,
         )
+        self.assets_with_rejected_partial_rect.discard(current_asset.tool_id)
         return self.render_overlay_result(
             "move_text_overlay",
             base_asset,
@@ -1766,6 +1814,21 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
         statuses = [result.payload.get("status") for result in results if result.payload.get("status")]
         if statuses and all(status == "skipped_duplicate" for status in statuses):
             break
+        previous_statuses = [payload.get("status") for payload in payloads[:-len(results)] if payload.get("status")] if results else []
+        successful_explicit_move = any(
+            call.name == "move_text_overlay"
+            and all(key in call.arguments for key in ["x", "y", "width", "height"])
+            and result.payload.get("status") == "success"
+            for call, result in zip(tool_calls, results)
+        )
+        if successful_explicit_move:
+            break
+        recovered_from_rejected_move = (
+            any(status in {"invalid_partial_rect", "invalid_upper_retry", "invalid_upper_move"} for status in previous_statuses)
+            and any(result.name == "move_text_overlay" and result.payload.get("status") == "success" for result in results)
+        )
+        if recovered_from_rejected_move:
+            break
 
         messages.append(
             {
@@ -1775,6 +1838,18 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
                 "tool_responses": [result.as_tool_response() for result in results],
             }
         )
+        if latest_output_path:
+            grid_path = render_coordinate_grid(latest_output_path)
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": open_image(latest_output_path)},
+                        {"type": "image", "image": open_image(grid_path)},
+                        {"type": "text", "text": rendered_overlay_review_prompt(results)},
+                    ],
+                }
+            )
         raw = generate_raw(messages, PRODUCTION_TOOLS, sample=False)
         tool_calls = parse_tool_calls(raw)
 
@@ -1784,6 +1859,38 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
     if produced_source_type(assets) == "synthetic_demo_image":
         latest_output_path = render_synthetic_disclosure_badge(latest_output_path)
     return VisualWorkflowResult(produced_path=latest_output_path, tool_calls=seen_calls, tool_payloads=payloads)
+
+
+def rendered_overlay_review_prompt(results: list[MediaToolResult]) -> str:
+    payload = next((result.payload for result in reversed(results) if result.output_path), {})
+    rendered_id = str(payload.get("asset_id") or "the rendered asset")
+    status = str(payload.get("status") or "")
+    x = payload.get("x")
+    y = payload.get("y")
+    width = payload.get("overlay_width")
+    height = payload.get("overlay_height")
+    box_line = ""
+    if all(value is not None for value in [x, y, width, height]):
+        box_line = f"\nCurrent label box: left={x}, top={y}, width={width}, height={height} on the 1080x1350 image."
+    error_line = ""
+    if status == "invalid_partial_rect":
+        error_line = "\nYour previous move was rejected because it gave only some coordinates. Call move_text_overlay again with all four integers: x, y, width, height."
+    elif status in {"invalid_upper_retry", "invalid_upper_move"}:
+        error_line = "\nYour previous move was rejected because it used a wide upper banner. Call move_text_overlay again with all four integers. Either choose a compact upper side/corner slot away from faces, or choose open middle rows such as row 3 or row 4."
+    return f"""
+Check the attached rendered image.
+The second attached image is the same render with a coordinate grid. Grid columns A-F are 180 pixels wide. Grid rows 1-6 are 225 pixels high.
+Faces are blocked, including side-profile faces and faces partly cropped by the image edge.
+Accept {rendered_id} only if the text is readable, does not touch any face/profile, body, animal, hands, tools, or main action, and does not ignore obvious open side or corner space.
+Move {rendered_id} if the text touches any face/profile, body, animal, hands, tools, action, or if the text is truncated.
+When moving away from one subject, do not move onto another subject.
+If a face/profile appears in row 1 or row 2, do not use a wide top band across that row. A compact upper side/corner sticker is allowed only when it stays away from the face.
+For animal-care scenes, a compact sticker in open middle-left or middle background is often better than a top banner.
+Upper text is allowed only when it does not touch any face/profile or main action.
+Bottom text is allowed only when the bottom is open; do not cover an animal, hands, tools, or lower action.
+If the current label is a large centered band and there is clear side or corner space, move it to that side or corner.
+If moving, first choose the clearest open grid cells, then call move_text_overlay with x, y, width, height covering only those cells. Do not add a second label.{box_line}{error_line}
+""".strip()
 
 
 def run_post_body_workflow(package: dict[str, Any], assets: list[ProductionAsset], background_briefing: str) -> str:
@@ -1863,15 +1970,18 @@ def overlay_request_from_arguments(
 
     explicit_rect_keys = ["x", "y", "width", "height"]
     has_complete_rect = all(key in arguments for key in explicit_rect_keys)
+    has_partial_rect = any(key in arguments for key in explicit_rect_keys)
     has_normalized_override = any(key in arguments for key in ["top_fraction", "max_width_fraction", "target_line_count"])
     rect = None
-    if has_complete_rect and not has_normalized_override:
+    if has_complete_rect:
         rect = (
             float(arguments.get("x") or 0),
             float(arguments.get("y") or 0),
             float(arguments.get("width") or 0),
             float(arguments.get("height") or 0),
         )
+    elif defaulting_to and defaulting_to.rect and has_partial_rect:
+        rect = defaulting_to.rect
     elif defaulting_to and defaulting_to.rect and not has_normalized_override:
         rect = defaulting_to.rect
 
@@ -1885,6 +1995,31 @@ def overlay_request_from_arguments(
         vertical_anchor=vertical_anchor if vertical_anchor in {"top", "center", "bottom"} else "top",
         rect=rect,
     )
+
+
+def partial_explicit_rect_error(arguments: dict[str, Any]) -> str | None:
+    explicit_rect_keys = ["x", "y", "width", "height"]
+    provided = [key for key in explicit_rect_keys if key in arguments]
+    if not provided or len(provided) == len(explicit_rect_keys):
+        return None
+    missing = [key for key in explicit_rect_keys if key not in arguments]
+    return f"Partial rectangle provided. Missing: {', '.join(missing)}."
+
+
+def upper_row_retry_error(arguments: dict[str, Any], after_rejected_partial_rect: bool) -> str | None:
+    if not after_rejected_partial_rect:
+        return None
+        return upper_row_move_error(arguments, message="Retry used a wide upper banner after a rejected partial move. Use a compact side/corner slot or open middle rows instead.")
+
+
+def upper_row_move_error(arguments: dict[str, Any], message: str | None = None) -> str | None:
+    if not all(key in arguments for key in ["x", "y", "width", "height"]):
+        return None
+    y = as_float_optional(arguments.get("y"))
+    width = as_float_optional(arguments.get("width"))
+    if y is not None and y < 225 and (width is None or width > 560):
+        return message or "Correction move used a wide upper banner. Use a compact side/corner slot or open middle rows instead."
+    return None
 
 
 def clean_overlay_text(text: str) -> str:
@@ -1931,7 +2066,7 @@ def render_image_overlay(
 
     pad_y = 18 if style == "tag" else 30
     draw.multiline_text(
-        (canvas_size[0] // 2, box_y + pad_y),
+        (box_x + (box_width / 2), box_y + pad_y),
         wrapped,
         font=font,
         fill=fill,
@@ -1944,6 +2079,51 @@ def render_image_overlay(
     output_path = output_dir / "rendered-overlay.jpg"
     canvas.save(output_path, quality=92)
     return str(output_path), frame, style
+
+
+def render_coordinate_grid(image_path: str) -> str:
+    canvas = open_image(image_path).convert("RGBA")
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    width, height = canvas.size
+    columns = 6
+    rows = 6
+    column_width = width / columns
+    row_height = height / rows
+    line_fill = (255, 218, 64, 150)
+    label_fill = (16, 20, 24, 235)
+    label_bg = (255, 255, 255, 210)
+    font = load_font(max(22, int(width * 0.026)), bold=True)
+
+    for index in range(columns + 1):
+        x = int(round(index * column_width))
+        draw.line((x, 0, x, height), fill=line_fill, width=3)
+    for index in range(rows + 1):
+        y = int(round(index * row_height))
+        draw.line((0, y, width, y), fill=line_fill, width=3)
+
+    for row in range(rows):
+        for column in range(columns):
+            label = f"{chr(ord('A') + column)}{row + 1}"
+            left = int(round(column * column_width))
+            top = int(round(row * row_height))
+            text_bbox = draw.textbbox((0, 0), label, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            pad_x = 8
+            pad_y = 5
+            label_rect = (
+                left + 8,
+                top + 8,
+                left + 8 + text_width + pad_x * 2,
+                top + 8 + text_height + pad_y * 2,
+            )
+            draw.rounded_rectangle(label_rect, radius=8, fill=label_bg)
+            draw.text((label_rect[0] + pad_x, label_rect[1] + pad_y), label, font=font, fill=label_fill)
+
+    output_dir = Path(tempfile.mkdtemp(prefix="aileen-relay-grid-"))
+    output_path = output_dir / "coordinate-grid.jpg"
+    canvas.convert("RGB").save(output_path, quality=90)
+    return str(output_path)
 
 
 def render_synthetic_disclosure_badge(image_path: str) -> str:
@@ -1992,9 +2172,10 @@ def resolve_overlay_frame(
     font_size = 34 if style == "tag" else 58
     font = load_font(font_size, bold=True)
     max_width_fraction = clamp(request.max_width_fraction or 0.72, 0.34, 0.78)
-    target_lines = int(clamp(float(request.target_line_count or 2), 1, 3))
+    target_lines = int(clamp(float(request.target_line_count or 2), 1, 4))
 
-    if request.rect and request.rect[2] > 0 and request.rect[3] > 0:
+    slot_rect = request.rect if request.rect and request.rect[2] > 0 and request.rect[3] > 0 else None
+    if slot_rect:
         slot_x, slot_y, slot_width, slot_height = request.rect
         max_frame_width = int(clamp(slot_width, canvas_size[0] * 0.34, canvas_size[0] * 0.78))
         top = int(slot_y)
@@ -2013,14 +2194,30 @@ def resolve_overlay_frame(
     box_width = min(max_frame_width, text_width + pad_x * 2)
     box_height = text_height + pad_y * 2
 
-    if request.horizontal_anchor == "left":
+    if slot_rect:
+        slot_x, slot_y, slot_width, slot_height = slot_rect
+        if request.horizontal_anchor == "left":
+            box_x = int(slot_x)
+        elif request.horizontal_anchor == "right":
+            box_x = int(slot_x + max(slot_width - box_width, 0))
+        else:
+            box_x = int(slot_x + max((slot_width - box_width) / 2, 0))
+    elif request.horizontal_anchor == "left":
         box_x = int(canvas_size[0] * 0.06)
     elif request.horizontal_anchor == "right":
         box_x = int(canvas_size[0] - box_width - canvas_size[0] * 0.06)
     else:
         box_x = int((canvas_size[0] - box_width) / 2)
 
-    if request.vertical_anchor == "center":
+    if slot_rect:
+        _slot_x, slot_y, _slot_width, slot_height = slot_rect
+        if request.vertical_anchor == "center":
+            box_y = int(slot_y + max((slot_height - box_height) / 2, 0))
+        elif request.vertical_anchor == "bottom":
+            box_y = int(slot_y + max(slot_height - box_height, 0))
+        else:
+            box_y = int(slot_y)
+    elif request.vertical_anchor == "center":
         box_y = int((canvas_size[1] - box_height) / 2)
     elif request.vertical_anchor == "bottom":
         box_y = int(canvas_size[1] - box_height - canvas_size[1] * 0.08)
@@ -2199,9 +2396,10 @@ def wrap_overlay_text(text: str, font: Any, max_width: int, target_lines: int) -
     if len(lines) <= target_lines:
         return "\n".join(lines)
 
-    kept = lines[:target_lines]
-    kept[-1] = textwrap.shorten(kept[-1] + " " + " ".join(lines[target_lines:]), width=32, placeholder="...")
-    return "\n".join(kept)
+    if target_lines < 4:
+        return wrap_overlay_text(text, font, max_width, target_lines + 1)
+
+    return "\n".join(lines[:target_lines])
 
 
 def as_float_optional(value: Any) -> float | None:

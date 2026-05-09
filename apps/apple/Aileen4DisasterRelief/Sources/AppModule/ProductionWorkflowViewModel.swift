@@ -1161,12 +1161,24 @@ enum ProductionPrompts {
         \(validSourceIDs.isEmpty ? "(none selected)" : validSourceIDs)
         </valid_source_asset_ids>
 
+        Placement checklist:
+        1. Find faces, animals, hands, tools, and the main story evidence.
+        2. Find empty space: sky, wall, water, open ground, side margin, or corner.
+        3. Do not put the text box directly across faces, bodies, animals, hands, tools, or action.
+        4. Edge faces and profile faces count as faces.
+        5. Upper text is OK only if it does not touch any face or main action.
+        6. Bottom text is OK only if the bottom area is open.
+        7. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
+        8. If a face/profile is in the top rows, do not choose an upper-center band.
+        9. If top or bottom would cover the subject, use side or corner open space.
+        10. For sticker text longer than five words, use two or three lines.
+
         Tool-call rules:
         - When tool use is available, do not return the overlay copy as plain text.
         - For a single source asset, call add_text_overlay directly on that asset_id with one compact overlay_text.
         - asset_id must be exactly one listed or returned ID such as asset_1 or rendered_2; never include overlay_text or punctuation in asset_id.
         - After add_text_overlay succeeds, call accept_overlay_layout on the returned rendered asset_id unless the layout clearly needs a move_text_overlay correction.
-        - Keep overlay_text to one short line.
+        - Keep overlay_text compact. For more than five words, request two lines.
         - No hashtags unless clearly supported by the story.
         - No emojis unless clearly supported by the story.
         """
