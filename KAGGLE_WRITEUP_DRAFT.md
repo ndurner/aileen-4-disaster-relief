@@ -253,6 +253,40 @@ The final runtime architecture stopped treating the overlay workflow as one gian
 
 An equally important part of this phase was stopping the system from dragging full multimodal history forward. That reduced LiteRT memory pressure and aligned the runtime with Gemma 4's guidance for thought-enabled multi-turn conversations.
 
+### Phase 7: Coordinate scaffolds and clean-frame correction
+
+Two late changes produced an outsized improvement in manual testing.
+
+The first was adding an explicit coordinate scaffold for correction-stage
+reasoning. Inspired by grid-annotation work such as arXiv 2402.12058, the lab
+started attaching a temporary coordinate view of the rendered frame: a simple
+grid with labeled regions and center dots. The grid is not part of the final
+export. It exists only to give Gemma a shared spatial language for proposals
+such as "move into the lower-left open grass" or "use the quiet sky above the
+orange band." This matters because a small on-device model often understands
+the scene semantically but struggles to map that understanding into stable
+pixel coordinates. The scaffold turned vague spatial language into a more
+concrete coordinate task without hard-coding a specific placement.
+
+The second was counterintuitive: during correction, the model should not be
+shown the fully rendered bad overlay as the main visual evidence. When Gemma saw
+the actual sticker/text overlay on top of the image, it often rationalized the
+previous choice, approved close calls, or focused on the typography rather than
+the underlying subject obstruction. The better loop shows the clean frame plus a
+temporary outline of the proposed overlay rectangle, along with the coordinate
+scaffold and strict accept/move instructions. In other words, the correction
+model judges "would this whole box cover the face, animal, hands, or story
+evidence?" rather than being asked to admire or critique an already-designed
+graphic. That reduced approval bias and made it easier for Gemma to propose a
+new rectangle instead of defending the old one.
+
+This does not mean Gemma should never see rendered artifacts. The lab still
+keeps rendered outputs for scoring and human inspection, and thinking mode
+remains enabled so the model can articulate its visual reasoning in diagnostic
+traces. The important distinction is that correction-stage placement should be
+based on a clean spatial decision aid, not on feeding the model the same flawed
+composite and hoping it will self-correct.
+
 ## What Worked
 
 ### Strong positive case: side-subject image
@@ -331,11 +365,13 @@ At this point the best recipe is:
 2. Use thinking mode for both overlay generation and post-body generation.
 3. Ask Gemma for a conservative subject keep-clear box and a coarse free-space patch rather than a perfect final overlay rectangle.
 4. Convert that guidance into protected regions and let Swift own the final measured placement in guarded mode.
-5. After each newly rendered frame, restart the Gemma conversation around that latest frame plus a compact task recap instead of carrying the full multimodal history forward.
-6. Keep a one-shot full session rebuild retry as a safety fallback for LiteRT-LM.
-7. Strip thought-channel text from visible app output and from any assistant history used for recovery, keeping thought traces only in the lab diagnostics.
-8. Score overlap using rendered-image analysis, and penalize placements that crowd tall central subjects even when they technically miss the bbox.
-9. Treat thinking/output token budget as a real quality-control parameter; a mid-range budget such as `4000` can be materially better than `1024` on some story-sensitive cases, but the optimum is image-dependent and should be treated as tunable rather than fixed dogma.
+5. In correction passes, give Gemma a coordinate scaffold and clean-frame overlay outline so it can reason about the full proposed box without being biased by the already-rendered sticker.
+6. Avoid feeding the bad composite overlay back as the primary correction image; use rendered composites for artifact inspection and scoring, not as the model's main self-correction evidence.
+7. After each newly rendered frame, restart the Gemma conversation around that latest frame plus a compact task recap instead of carrying the full multimodal history forward.
+8. Keep a one-shot full session rebuild retry as a safety fallback for LiteRT-LM.
+9. Strip thought-channel text from visible app output and from any assistant history used for recovery, keeping thought traces only in the lab diagnostics.
+10. Score overlap using rendered-image analysis, and penalize placements that crowd tall central subjects even when they technically miss the bbox.
+11. Treat thinking/output token budget as a real quality-control parameter; a mid-range budget such as `4000` can be materially better than `1024` on some story-sensitive cases, but the optimum is image-dependent and should be treated as tunable rather than fixed dogma.
 
 ## Next Engineering Steps
 

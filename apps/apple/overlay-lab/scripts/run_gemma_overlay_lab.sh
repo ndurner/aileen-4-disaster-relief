@@ -43,7 +43,7 @@ choose_device() {
   fi
 
   xcrun simctl boot "$fallback" >/dev/null
-  xcrun simctl bootstatus "$fallback" -b
+  xcrun simctl bootstatus "$fallback" -b >&2
   printf '%s\n' "$fallback"
 }
 
@@ -115,6 +115,16 @@ main() {
   for path in "${existing_inputs[@]}"; do
     local target="$input_root/$(basename "$path")"
     cp "$path" "$target"
+    local sidecar
+    for sidecar in \
+      "${path%.*}.txt" \
+      "${path%.*}.briefing.txt" \
+      "$(dirname "$path")/background_briefing.txt" \
+      "$(dirname "$path")/briefing.txt"; do
+      if [[ -f "$sidecar" ]]; then
+        cp "$sidecar" "$input_root/$(basename "$sidecar")"
+      fi
+    done
     copied_inputs+=("$target")
   done
 
@@ -129,15 +139,34 @@ from pathlib import Path
 config_path = Path(sys.argv[1])
 inputs = [Path(p) for p in sys.argv[2:]]
 
-background = os.environ.get("AILEEN_GEMMA_BACKGROUND") or (
-    "Create an Instagram-style wildlife or conservation visual. "
-    "The tone should feel current to recent Instagram story aesthetics, "
-    "not like a news chyron or a fixed top banner."
-)
-story = os.environ.get("AILEEN_GEMMA_STORY") or (
-    "Use the image itself as the factual grounding. "
-    "If an overlay helps, keep it very short, concrete, and visually native to the frame."
-)
+def read_text(path):
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+
+
+def sidecar_text(input_path, suffix):
+    candidates = [
+        input_path.with_suffix(suffix),
+        input_path.with_name(f"{input_path.stem}{suffix}"),
+    ]
+    for candidate in candidates:
+        text = read_text(candidate)
+        if text:
+            return text
+    return ""
+
+
+default_background = ""
+for candidate_name in ("background_briefing.txt", "briefing.txt"):
+    candidate_text = read_text(config_path.parent / "inputs" / candidate_name)
+    if candidate_text:
+        default_background = candidate_text
+        break
+
+global_background = os.environ.get("AILEEN_GEMMA_BACKGROUND")
+global_story = os.environ.get("AILEEN_GEMMA_STORY")
 allowed_suffixes = {
     item.strip()
     for item in os.environ.get("AILEEN_GEMMA_SCENARIOS", "").split(",")
@@ -337,6 +366,12 @@ scenarios = []
 for input_path in inputs:
     relative_path = f"Documents/OverlayAutomation/inputs/{input_path.name}"
     stem = input_path.stem
+    story = global_story if global_story is not None else sidecar_text(input_path, ".txt")
+    background = (
+        global_background
+        if global_background is not None
+        else sidecar_text(input_path, ".briefing.txt") or default_background
+    )
     for template in scenario_templates:
         for enable_thinking, thinking_suffix in thinking_values:
             scenarios.append(
@@ -379,13 +414,28 @@ PY
 
   local launch_log="$output_root/simulator.log"
   : >"$launch_log"
-  env SIMCTL_CHILD_AILEEN_AUTOMATION_CONFIG_PATH="Documents/OverlayAutomation/config.json" \
-    xcrun simctl launch \
-      --stdout="$launch_log" \
-      --stderr="$launch_log" \
-      --terminate-running-process \
-      "$device_id" "$BUNDLE_ID" \
-      >/dev/null
+  local launch_env=(
+    "SIMCTL_CHILD_AILEEN_AUTOMATION_CONFIG_PATH=Documents/OverlayAutomation/config.json"
+  )
+  local forwarded_key
+  for forwarded_key in \
+    GEMMA_LITERT_MAX_NUM_TOKENS \
+    GEMMA_LITERT_MAX_OUTPUT_TOKENS \
+    GEMMA_LITERT_TEXT_BACKEND \
+    GEMMA_LITERT_VISION_BACKEND \
+    GEMMA_LITERT_CONSTRAINED_DECODING \
+    AILEEN_GEMMA_BRIDGE_DEBUG; do
+    if [[ -n "${!forwarded_key:-}" ]]; then
+      launch_env+=("SIMCTL_CHILD_${forwarded_key}=${!forwarded_key}")
+    fi
+  done
+
+  env "${launch_env[@]}" xcrun simctl launch \
+    --stdout="$launch_log" \
+    --stderr="$launch_log" \
+    --terminate-running-process \
+    "$device_id" "$BUNDLE_ID" \
+    >/dev/null
 
   local found_results=0
   local timeout_seconds="${AILEEN_GEMMA_LAB_TIMEOUT_SECONDS:-900}"

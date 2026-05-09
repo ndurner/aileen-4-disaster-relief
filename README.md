@@ -180,7 +180,8 @@ Exports are written into the app's Documents area as an Aileen YAML package:
 
 Relay Desk consumes the same Desk Mode package plus the transferred media. For
 still images it runs Gemma 4 E4B in a Hugging Face ZeroGPU Gradio Space, renders
-the final story visual with Python image tooling, generates the same post text
+the final story visual with Python image tooling, aspect-fills source stills to
+the same `1080 x 1350` image canvas used by Field Mode, generates the same post text
 stage as Field Mode, and exports a completed package containing
 `aileen-job.yaml` plus produced media under `media/`.
 
@@ -291,7 +292,17 @@ Relay Desk is designed for a Hugging Face Gradio Space on ZeroGPU. It uses
 `google/gemma-4-E4B-it` through Transformers, renders the story image with
 Pillow, and does not call the Gemini API. Local Apple Silicon runs use PyTorch
 MPS automatically when available; set `AILEEN_RELAY_DEVICE=cpu`, `mps`, or
-`cuda` to override device selection.
+`cuda` to override device selection. Relay enables Gemma thinking by default
+for production and batch runs, captures raw model responses and extracted
+thinking traces in the batch harness, and uses `AILEEN_RELAY_ENABLE_THINKING=0`
+only for no-thinking comparisons. Thinking runs default to a bounded
+`AILEEN_RELAY_MAX_NEW_TOKENS=1200` generation cap to keep local MPS runs stable;
+raise it only when diagnosing truncated thoughts or tool calls.
+The Apple LiteRT-LM bridge uses the same 1200-token output cap by default and
+an 8192-token engine budget so thinking-mode prompts have room for image/tool
+context before the model emits tool calls. Override with
+`GEMMA_LITERT_MAX_OUTPUT_TOKENS` or `GEMMA_LITERT_MAX_NUM_TOKENS` when running
+targeted experiments.
 
 Restore Google AI Edge artifacts after a fresh clone:
 
@@ -343,6 +354,23 @@ Run the overlay lab:
 apps/apple/overlay-lab/scripts/overlay_lab.sh analyze /tmp/insta-samples/*
 apps/apple/overlay-lab/scripts/run_gemma_overlay_lab.sh /tmp/test-imgs/*
 ```
+
+Build the Kaggle-ready overlay-placement benchmark from the active synthetic
+fixtures:
+
+```bash
+services/relay-desk/.venv/bin/python \
+  apps/apple/overlay-lab/scripts/build_kaggle_overlay_dataset.py \
+  --clean \
+  --dataset-id YOUR_KAGGLE_USERNAME/aileen-overlay-placement-benchmark
+```
+
+The generated package is written under
+`/tmp/aileen-kaggle-datasets/overlay-placement-benchmark/` and contains Kaggle
+metadata, copied synthetic images/stories, control placements, benchmark
+configuration, and the Codex grading schema. The copied PNGs are dataset payload
+files; they are separate from Kaggle's optional `dataset-cover-image.*`
+metadata convention.
 
 ## Notes
 
