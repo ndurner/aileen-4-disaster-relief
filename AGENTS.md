@@ -16,6 +16,21 @@ README maintenance:
     - Prefer documenting the actual runtime/API surface over where credentials or artifacts were obtained. For example, cloud Gemma calls should be described as Gemini API usage unless the Google AI Studio product surface itself is material.
     - Remove or rewrite stale roadmap wording when implementation takes a different path; do not leave obsolete "future" or "incomplete" notes in place after the feature lands differently.
 
+Gemma 4 overlay quality follow-up:
+    - 2026-04-24 local E2B simulator checks with CPU and 4096 max tokens completed without crashes after using the LiteRT-LM-compatible continuation path.
+    - The repeated baseline result was mechanically complete but low quality: Gemma called `compose_visuals`, `add_text_overlay`, and `accept_overlay_layout`, yet placed a top sticker that overlapped the subject and received a `combinedScore` of 0 from the evaluator.
+    - The repeated tool arguments were roughly: `overlay_text="POV: This is the sound of Australia."`, `style="sticker"`, `top_fraction=0.1`, plus zero-ish raw `x`/`width` and `y=100`.
+    - 2026-04-27 E4B simulator run for `scratch/aileen-validation/IMG_0312.jpeg` crashed before any tool-call result while creating the LiteRT-LM session. Crash report `Aileen4DisasterRelief-2026-04-27-184514.ips` points at TFLite/XNNPACK weight-cache initialization (`MMapWeightCacheProvider::OffsetToAddr` under `LlmLiteRtCompiledModelExecutorStatic::Create`), so do not treat that E4B crash as overlay prompt quality signal.
+    - Treat this as unresolved prompt/tool-contract work. The current stability fix should not be mistaken for a good overlay-placement result.
+
+Processing pipeline parity:
+    - When changing production prompt wording, tool schemas, correction-stage review prompts, image attachments, coordinate/grid aids, thinking-mode settings, token budgets, media rendering semantics, or parser behavior, maintain functional parity across:
+        - Gradio / Relay Desk Transformers processing
+        - iOS on-device LiteRT-LM processing
+        - iOS cloud Gemini API processing
+    - If exact parity is impossible because a runtime lacks a feature, document the gap in the relevant README or parity note and keep the fallback behavior intentionally equivalent at the product level.
+    - Do not tune only one pipeline and leave the others with stale model interaction contracts.
+
 Dependency and supply-chain policy:
     - Prefer first-party platform frameworks or dependencies we can build from source in our own CI over opaque prebuilt binaries.
     - Do not introduce retired, archived, or effectively unmaintained third-party dependencies unless explicitly approved for a time-boxed prototype.
