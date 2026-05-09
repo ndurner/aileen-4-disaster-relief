@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "grade",
+    "overlay_covers_face_or_subject",
+    "overlay_quality",
+    "reason",
+    "recommended_direction"
+  ],
+  "properties": {
+    "grade": {
+      "type": "string",
+      "enum": ["pass", "warn", "fail"]
+    },
+    "overlay_covers_face_or_subject": {
+      "type": "boolean"
+    },
+    "overlay_quality": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "reason": {
+      "type": "string"
+    },
+    "recommended_direction": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "move_up",
+        "move_down",
+        "move_left",
+        "move_right",
+        "shrink",
+        "remove_or_redesign"
+      ]
+    }
+  }
+}

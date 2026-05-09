@@ -50,23 +50,33 @@ def select_torch_device(requested_device: str) -> torch.device:
     raise RuntimeError(f"AILEEN_RELAY_DEVICE={requested_device!r} is not available. Expected one of: {expected}.")
 
 
-MODEL_DEVICE = select_torch_device(DEVICE_REQUEST)
-MODEL_DTYPE = torch.float16 if MODEL_DEVICE.type == "mps" else "auto"
-MODEL_LOAD_KWARGS: dict[str, Any] = {
-    "dtype": MODEL_DTYPE,
-}
-if MODEL_DEVICE.type == "cuda":
-    MODEL_LOAD_KWARGS["device_map"] = "auto"
+_processor: Any | None = None
+_model: Any | None = None
 
-print(f"Aileen Relay Desk loading {MODEL_ID} on {MODEL_DEVICE.type} with dtype={MODEL_DTYPE}.", flush=True)
-processor = AutoProcessor.from_pretrained(MODEL_ID)
-model = AutoModelForMultimodalLM.from_pretrained(
-    MODEL_ID,
-    **MODEL_LOAD_KWARGS,
-)
-if MODEL_DEVICE.type != "cuda":
-    model.to(MODEL_DEVICE)
-model.eval()
+
+def model_bundle() -> tuple[Any, Any]:
+    global _processor, _model
+    if _processor is not None and _model is not None:
+        return _processor, _model
+
+    model_device = select_torch_device(DEVICE_REQUEST)
+    model_dtype = torch.float16 if model_device.type == "mps" else "auto"
+    model_load_kwargs: dict[str, Any] = {
+        "dtype": model_dtype,
+    }
+    if model_device.type == "cuda":
+        model_load_kwargs["device_map"] = "auto"
+
+    print(f"Aileen Relay Desk loading {MODEL_ID} on {model_device.type} with dtype={model_dtype}.", flush=True)
+    _processor = AutoProcessor.from_pretrained(MODEL_ID)
+    _model = AutoModelForMultimodalLM.from_pretrained(
+        MODEL_ID,
+        **model_load_kwargs,
+    )
+    if model_device.type != "cuda":
+        _model.to(model_device)
+    _model.eval()
+    return _processor, _model
 
 
 CSS = """
@@ -1237,7 +1247,8 @@ Return only the caption text. Do not include a label, explanation, tool call, ma
 
 
 def model_input_device() -> torch.device:
-    return next(model.parameters()).device
+    _, active_model = model_bundle()
+    return next(active_model.parameters()).device
 
 
 def open_image(path: str) -> Image.Image:
@@ -1250,6 +1261,7 @@ def generate_raw(
     max_new_tokens: int = MAX_NEW_TOKENS,
     sample: bool = True,
 ) -> str:
+    active_processor, active_model = model_bundle()
     template_kwargs = {
         "conversation": messages,
         "tokenize": True,
@@ -1260,7 +1272,7 @@ def generate_raw(
     }
     if tools:
         template_kwargs["tools"] = tools
-    inputs = processor.apply_chat_template(**template_kwargs).to(model_input_device())
+    inputs = active_processor.apply_chat_template(**template_kwargs).to(model_input_device())
 
     with torch.inference_mode():
         generation_kwargs: dict[str, Any] = {
@@ -1275,12 +1287,12 @@ def generate_raw(
                     "top_k": 64,
                 }
             )
-        generated_ids = model.generate(**inputs, **generation_kwargs)
+        generated_ids = active_model.generate(**inputs, **generation_kwargs)
 
     generated_ids_trimmed = [
         out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs["input_ids"], generated_ids)
     ]
-    decoded = processor.batch_decode(
+    decoded = active_processor.batch_decode(
         generated_ids_trimmed,
         skip_special_tokens=False,
         clean_up_tokenization_spaces=False,
@@ -1312,8 +1324,9 @@ def tool_call_has_required_arguments(tool_call: ToolCall) -> bool:
 
 
 def parse_assistant_response(text: str) -> dict[str, Any]:
+    active_processor, _ = model_bundle()
     try:
-        parsed = processor.parse_response(normalize_gemma_response_for_hf_parser(text))
+        parsed = active_processor.parse_response(normalize_gemma_response_for_hf_parser(text))
     except Exception as exc:
         preview = strip_thinking_traces(text).replace("\n", " ")[:240]
         raise gr.Error(f"The model response could not be read as Gemma 4 chat output. Preview: {preview}") from exc
@@ -1896,7 +1909,7 @@ def render_image_overlay(
     request: OverlayRequest,
     canvas_size: tuple[int, int],
 ) -> tuple[str, tuple[int, int, int, int], str]:
-    canvas = open_image(image_path).resize(canvas_size, Image.Resampling.LANCZOS)
+    canvas = aspect_fill(open_image(image_path), canvas_size)
     draw = ImageDraw.Draw(canvas, "RGBA")
     frame, style, wrapped, font = resolve_overlay_frame(draw, request, canvas_size)
     box_x, box_y, box_width, box_height = frame

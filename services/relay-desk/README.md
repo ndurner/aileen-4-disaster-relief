@@ -61,10 +61,11 @@ ZeroGPU is Gradio-SDK only, so this Space does not use a Dockerfile. System
 packages such as fonts belong in `packages.txt`; Hugging Face installs each line
 with `apt-get install` during the Space build.
 
-Gemma 4 E4B is loaded when the Space starts. The Space README preloads the model
-from the Hub to reduce startup friction. If the model requires authenticated
-access in the deployment account, add the appropriate Hugging Face token as a
-Space secret.
+Gemma 4 E4B is preloaded by the Space runtime but lazy-loaded by the Python app.
+Importing `app.py` builds the Gradio UI and batchable workflow functions without
+constructing the model. The model is loaded on the first generation request. If
+the model requires authenticated access in the deployment account, add the
+appropriate Hugging Face token as a Space secret.
 
 ## Run Locally
 
@@ -89,3 +90,14 @@ AILEEN_RELAY_DEVICE=mps python app.py
 Valid values are `auto`, `mps`, `cuda`, and `cpu`, subject to local PyTorch
 support. The app sets `PYTORCH_ENABLE_MPS_FALLBACK=1` by default so unsupported
 MPS operators can fall back instead of aborting the run.
+
+Run the production workflow in batch mode without launching Gradio:
+
+```bash
+python relay_batch.py \
+  --dataset /tmp/aileen-kaggle-datasets/overlay-placement-benchmark \
+  --out /tmp/aileen-relay-batch \
+  --limit 2
+```
+
+Use `--dry-run` to validate dataset discovery without loading Gemma.

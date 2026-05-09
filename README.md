@@ -180,7 +180,8 @@ Exports are written into the app's Documents area as an Aileen YAML package:
 
 Relay Desk consumes the same Desk Mode package plus the transferred media. For
 still images it runs Gemma 4 E4B in a Hugging Face ZeroGPU Gradio Space, renders
-the final story visual with Python image tooling, generates the same post text
+the final story visual with Python image tooling, aspect-fills source stills to
+the same `1080 x 1350` image canvas used by Field Mode, generates the same post text
 stage as Field Mode, and exports a completed package containing
 `aileen-job.yaml` plus produced media under `media/`.
 
@@ -343,6 +344,23 @@ Run the overlay lab:
 apps/apple/overlay-lab/scripts/overlay_lab.sh analyze /tmp/insta-samples/*
 apps/apple/overlay-lab/scripts/run_gemma_overlay_lab.sh /tmp/test-imgs/*
 ```
+
+Build the Kaggle-ready overlay-placement benchmark from the active synthetic
+fixtures:
+
+```bash
+services/relay-desk/.venv/bin/python \
+  apps/apple/overlay-lab/scripts/build_kaggle_overlay_dataset.py \
+  --clean \
+  --dataset-id YOUR_KAGGLE_USERNAME/aileen-overlay-placement-benchmark
+```
+
+The generated package is written under
+`/tmp/aileen-kaggle-datasets/overlay-placement-benchmark/` and contains Kaggle
+metadata, copied synthetic images/stories, control placements, benchmark
+configuration, and the Codex grading schema. The copied PNGs are dataset payload
+files; they are separate from Kaggle's optional `dataset-cover-image.*`
+metadata convention.
 
 ## Notes
 

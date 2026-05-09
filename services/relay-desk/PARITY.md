@@ -64,5 +64,8 @@ Field Mode parity.
 - The Python overlay renderer should stay aligned with `OverlayCore.swift`; it
   is acceptable as a local mirror only if it accepts the same tool arguments and
   returns the same payload shape.
+- Relay Desk must aspect-fill source still images into the `1080 x 1350`
+  canvas before drawing overlays. Directly resizing source photos to the canvas
+  shape is a bug because it distorts subjects and invalidates placement tests.
 - Full Gemma overlay pre-analysis can be added later by porting
   `submit_overlay_layout_guide` and the `OverlayLayoutGuidance` addendum.
