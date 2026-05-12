@@ -104,8 +104,9 @@ Current product areas in the app:
   Media intake, output-format selection, Field Mode generation, Desk Mode
   handoff packaging, retry, export, and sharing.
 - `Settings`
-  Collaborator mode, processing location, on-device model selection, hosted model
-  selection, model download/import status, and Gemini API key storage.
+  Collaborator mode, processing location, on-device Gemma 4 E2B/E4B selection,
+  cloud Gemma 4 26B A4B/31B selection, model download/import status, and
+  Gemini API key storage.
 
 ## Model Strategy
 

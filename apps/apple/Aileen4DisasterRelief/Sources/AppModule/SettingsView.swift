@@ -12,11 +12,9 @@ struct SettingsView: View {
 
     var body: some View {
         OceanScreen {
-            AileenWorkflowCard(
-                    imageName: "AileenSettingsScene",
-                    title: "Choose how I work",
-                    message: "Create the post now or prepare it for a teammate to finish later."
-                ) {
+            OceanCard {
+                OceanSectionHeader(title: "Creation settings")
+
                 productionExecutionModePicker
 
                 processingLocationPicker
@@ -35,7 +33,6 @@ struct SettingsView: View {
             if appState.productionExecutionMode == .field {
                 if appState.inferenceMode == .onDevice {
                     onDeviceModelsCard
-                    importCard
                 } else {
                     googleAIStudioCard
                 }
@@ -88,34 +85,29 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
 
-            VStack(spacing: 10) {
-                ForEach(ProductionExecutionMode.allCases) { mode in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: appState.productionExecutionMode == mode ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(appState.productionExecutionMode == mode ? OceanPalette.reef : OceanPalette.ink.opacity(0.42))
-                            .padding(.top, 2)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: appState.productionExecutionMode == .field ? "bolt.circle.fill" : "tray.and.arrow.up.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(OceanPalette.deepWater)
+                    .padding(.top, 2)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(mode.displayName) Mode: \(mode.shortLabel)")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(OceanPalette.ink)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(appState.productionExecutionMode.shortLabel)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink)
 
-                            Text(mode.detail)
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(OceanPalette.ink.opacity(0.64))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white.opacity(appState.productionExecutionMode == mode ? 0.62 : 0.42))
-                    )
+                    Text(appState.productionExecutionMode.detail)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.52))
+            )
         }
     }
 
@@ -144,11 +136,22 @@ struct SettingsView: View {
 
     private var onDeviceModelsCard: some View {
         OceanCard {
-            OceanSectionHeader(title: "On-device models", detail: "Downloaded, imported, and injected are the same here")
+            OceanSectionHeader(title: "On-device Gemma 4", detail: "E2B and E4B")
 
-            VStack(spacing: 12) {
+            Text("Download a model, or choose the matching file from Files.")
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(OceanPalette.ink.opacity(0.66))
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 0) {
                 ForEach(ModelOption.allCases) { model in
                     onDeviceModelRow(model)
+
+                    if model.id != ModelOption.allCases.last?.id {
+                        Divider()
+                            .overlay(OceanPalette.deepWater.opacity(0.10))
+                            .padding(.leading, 56)
+                    }
                 }
             }
         }
@@ -159,37 +162,52 @@ struct SettingsView: View {
         let downloadState = modelDownloadStore.state(for: model)
         let isAvailable = availability.url != nil
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: isAvailable ? "checkmark.circle.fill" : "circle.dashed")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(isAvailable ? OceanPalette.reef : OceanPalette.coral)
-                    .padding(.top, 2)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isAvailable ? OceanPalette.tideFoam : OceanPalette.coral.opacity(0.16))
+
+                    Image(systemName: isAvailable ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(isAvailable ? OceanPalette.deepWater : OceanPalette.coral)
+                }
+                .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(model.displayName)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(OceanPalette.ink)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(model.displayName)
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundStyle(OceanPalette.ink)
 
-                    Text(availability.detail)
+                        Text(isAvailable ? "Ready" : "Needed")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(isAvailable ? OceanPalette.deepWater : OceanPalette.coral)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(isAvailable ? OceanPalette.tideFoam.opacity(0.95) : OceanPalette.coral.opacity(0.16))
+                            )
+                    }
+
+                    Text(model.defaultUse)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(OceanPalette.ink.opacity(0.64))
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
 
-            Text("Download source: \(model.downloadSourceName)")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(OceanPalette.ink.opacity(0.58))
-                .fixedSize(horizontal: false, vertical: true)
+                    Text(availability.detail)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isAvailable ? OceanPalette.deepWater.opacity(0.78) : OceanPalette.ink.opacity(0.56))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
 
             modelDownloadControls(for: model, state: downloadState, isAvailable: isAvailable)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.white.opacity(0.52))
-        )
+        .padding(.vertical, 16)
     }
 
     @ViewBuilder
@@ -226,36 +244,29 @@ struct SettingsView: View {
                         .foregroundStyle(OceanPalette.deepWater)
                 }
 
-                Button(isAvailable ? "Download fresh copy" : "Download model") {
-                    modelDownloadStore.startDownload(for: model)
+                HStack(spacing: 10) {
+                    Button(isAvailable ? "Replace \(model.shortModelName)" : "Download \(model.shortModelName)") {
+                        modelDownloadStore.startDownload(for: model)
+                    }
+                    .buttonStyle(OceanPrimaryButtonStyle())
+
+                    Button {
+                        importPickerPresented = true
+                    } label: {
+                        Label("Files", systemImage: "folder")
+                    }
+                    .buttonStyle(OceanSecondaryButtonStyle())
                 }
-                .buttonStyle(OceanPrimaryButtonStyle())
             }
-        }
-    }
-
-    private var importCard: some View {
-        OceanCard {
-            OceanSectionHeader(title: "Add an on-device model")
-
-            Button("Import .litertlm from Files") {
-                importPickerPresented = true
-            }
-            .buttonStyle(OceanPrimaryButtonStyle())
-
-            Text("Imported files are available for creating posts on this device.")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(OceanPalette.ink.opacity(0.64))
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var googleAIStudioCard: some View {
         OceanCard {
-            OceanSectionHeader(title: "Google AI Studio access", detail: appState.hasGoogleAIStudioAPIKey ? "Key saved" : "Key required")
+            OceanSectionHeader(title: "Gemini API access", detail: appState.hasGoogleAIStudioAPIKey ? "Key saved" : "Key required")
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Google AI Studio API key")
+                Text("Gemini API key")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(OceanPalette.ink)
 
@@ -286,12 +297,12 @@ struct SettingsView: View {
                 )
             }
 
-            Text("Cloud mode sends the post materials to a hosted model and returns the finished media and text.")
+            Text("Cloud creation uses the Gemini API with the selected Gemma 4 model.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OceanPalette.ink.opacity(0.68))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Use this when the device is too slow or does not have a local model ready.")
+            Text("Selected media is uploaded for the run, then removed after the finished post and media are returned.")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(OceanPalette.ink.opacity(0.64))
                 .fixedSize(horizontal: false, vertical: true)

@@ -9,7 +9,7 @@ enum GoogleAIStudioClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "Google AI Studio API key is missing. Add it in Settings before using cloud creation."
+            return "Gemini API key is missing. Add it in Settings before using cloud creation."
         case .invalidResponse(let message):
             return message
         case .upstream(let message):
@@ -335,7 +335,7 @@ struct GoogleAIStudioClient {
             switch urlError.code {
             case .timedOut:
                 return GoogleAIStudioClientError.transport("""
-                Gemini API request to \(model.requestModelIdentifier) timed out after \(Int(generateContentTimeout)) seconds (attempts: \(attemptCount)). The hosted model did not return before the field-mode deadline. Try again, switch to the smaller cloud model, or use on-device inference when network latency is high.
+                Gemini API request to \(model.requestModelIdentifier) timed out after \(Int(generateContentTimeout)) seconds (attempts: \(attemptCount)). \(model.displayName) did not return before the field-mode deadline. Try again, switch to Gemma 4 26B A4B, or use on-device inference when network latency is high.
                 """)
             case .networkConnectionLost:
                 return GoogleAIStudioClientError.transport("Gemini API request to \(model.requestModelIdentifier) lost the network connection. Check connectivity and try again.")

@@ -59,18 +59,27 @@ enum ModelOption: String, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .e2bLiteRT:
-            return "Fast device model"
+            return "Gemma 4 E2B"
         case .e4bLiteRT:
-            return "Larger device model"
+            return "Gemma 4 E4B"
         }
     }
 
     var defaultUse: String {
         switch self {
         case .e2bLiteRT:
-            return "Visual production"
+            return "Faster field runs and visual layout checks."
         case .e4bLiteRT:
-            return "Post body generation"
+            return "Stronger post body generation when there is time."
+        }
+    }
+
+    var shortModelName: String {
+        switch self {
+        case .e2bLiteRT:
+            return "E2B"
+        case .e4bLiteRT:
+            return "E4B"
         }
     }
 
@@ -102,18 +111,27 @@ enum CloudModelOption: String, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .gemma426bA4B:
-            return "Balanced cloud model"
+            return "Gemma 4 26B A4B"
         case .gemma431B:
-            return "Larger cloud model"
+            return "Gemma 4 31B"
         }
     }
 
     var detail: String {
         switch self {
         case .gemma426bA4B:
-            return "Good default for faster cloud creation."
+            return "Default cloud choice for field creation."
         case .gemma431B:
-            return "More capacity for harder posts, with longer waits."
+            return "Use for harder posts when a longer wait is acceptable."
+        }
+    }
+
+    var shortModelName: String {
+        switch self {
+        case .gemma426bA4B:
+            return "26B A4B"
+        case .gemma431B:
+            return "31B"
         }
     }
 
@@ -182,8 +200,8 @@ struct ModelLocator {
                 .appendingPathComponent(model.rawValue, isDirectory: false)
 
             let orderedCandidates: [(URL, String)] = [
-                (imported, "Available on device from downloaded or imported Files storage."),
-                (injected, "Available on device from Application Support/Models.")
+                (imported, "Ready on this device."),
+                (injected, "Ready on this device.")
             ]
 
             for (url, detail) in orderedCandidates where FileManager.default.fileExists(atPath: url.path) {
@@ -191,7 +209,7 @@ struct ModelLocator {
             }
 
             return .missing(
-                detail: "Expected \(model.rawValue) in Application Support/Models or the downloaded on-device model folder. Download it in Settings, add it from Files, or push it with the shared device script."
+                detail: "Download \(model.shortModelName), or add the matching model file from Files."
             )
         } catch {
             return .missing(detail: "Unable to resolve model storage: \(error.localizedDescription)")

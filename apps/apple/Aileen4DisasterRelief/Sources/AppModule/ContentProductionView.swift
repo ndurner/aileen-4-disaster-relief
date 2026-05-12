@@ -22,7 +22,7 @@ struct ContentProductionView: View {
             return "Needs attention"
         }
         if cloudModeNeedsAPIKey {
-            return "Google AI Studio key required"
+            return "Gemini API key required"
         }
         if viewModel.assets.isEmpty {
             return "Add media first"
