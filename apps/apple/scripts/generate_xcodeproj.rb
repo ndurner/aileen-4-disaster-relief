@@ -137,6 +137,7 @@ app_target.build_configurations.each do |config|
   config.build_settings["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
   config.build_settings["CODE_SIGN_IDENTITY"] = "Apple Development"
   config.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
+  config.build_settings["INFOPLIST_KEY_CFBundleDisplayName"] = "Aileen 4"
   config.build_settings["INFOPLIST_KEY_UIApplicationSceneManifest_Generation"] = "YES"
   config.build_settings["INFOPLIST_KEY_UILaunchScreen_Generation"] = "YES"
   config.build_settings["INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone"] = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
