@@ -171,6 +171,15 @@ The tool executor is implemented in Swift and renders locally with Apple
 frameworks. Images target a `1080 x 1350` canvas and reels target a
 `1080 x 1920` canvas.
 
+Overlay placement uses a model-driven correction pass after the first render.
+The correction prompt receives a single clean guide image made from the source
+image, a coordinate grid, and the current sticker outline; it does not receive
+the rendered sticker pixels. The correction tool requires exact `x`, `y`,
+`width`, and `height` slot coordinates, keeps a small edge margin, and asks the
+model to preserve safe side/corner placements instead of moving them for
+aesthetic churn. The same prompt/tool contract is mirrored across on-device
+LiteRT-LM, hosted Gemini API, and Relay Desk.
+
 Exports are written into the app's Documents area as an Aileen YAML package:
 
 - `aileen-job.yaml` with `aileen_job_version: 1`, `execution.mode:

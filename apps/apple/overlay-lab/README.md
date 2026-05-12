@@ -90,6 +90,30 @@ process. The app defaults to an 8192-token LiteRT engine budget and a
 1200-token output cap so thinking-mode generations have enough room to reach
 tool calls without sprawling indefinitely.
 
+The production-parity correction stage uses one reduced review image: clean
+source pixels, yellow coordinate grid, and a red outline for the current full
+sticker box. It intentionally does not show the rendered sticker text back to
+the model. The review tool contract requires exact `x`, `y`, `width`, and
+`height` slot coordinates, leaves at least 40 px of canvas margin, and tolerates
+minor first-stage normalized-hint/partial-coordinate mixtures only before the
+first render. Correction moves remain strict so coordinate mistakes are surfaced
+as retryable tool errors.
+
+The 2026-05-10 local E2B validation pass used real LiteRT-LM execution, thinking
+enabled, and `GEMMA_LITERT_MAX_OUTPUT_TOKENS=1200`. It covered:
+
+- `scratch/aileen-validation` photos, including retrying the two first-stage
+  partial-coordinate failures after the tolerant initial path landed.
+- `scratch/synthetic_testset` PNG cases, excluding `contact-sheet.jpg`.
+- `scratch/synthetic_testset/original-no-embedded-provenance-2026-05-03` JPEG
+  cases, excluding `contact-sheet.jpg`.
+
+Useful inspection artifacts from that pass:
+
+- `/tmp/aileen-litert-wide-validation-photos-contact-sheet.jpg`
+- `/tmp/aileen-litert-wide-synthetic-png-v1/20260510-170637/contact-sheet.jpg`
+- `/tmp/aileen-litert-wide-synthetic-originals-v1/20260510-173801/contact-sheet.jpg`
+
 The quality harness can also delegate to this simulator path:
 
 ```bash

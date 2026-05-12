@@ -51,7 +51,10 @@ Apple-specific support files live alongside the app:
 Field Mode generates here. It runs Gemma 4 on device through LiteRT-LM or in the
 cloud through the Gemini API, then exports `aileen-job.yaml` with
 `execution.mode: field_completed`, generated `story.post_body`, and finished
-media. If the source media is classified as `synthetic_demo_image`, the app
+media. Image overlay placement uses the shared production correction contract:
+after the first render, the model reviews a clean source/grid/outline guide and
+must return exact sticker slot coordinates or keep a safe current slot. If the
+source media is classified as `synthetic_demo_image`, the app
 stamps the finished image or reel with a small upper-left `AI` disclosure badge
 after the production overlay is rendered.
 

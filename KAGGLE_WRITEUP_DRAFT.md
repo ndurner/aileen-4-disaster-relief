@@ -287,6 +287,26 @@ traces. The important distinction is that correction-stage placement should be
 based on a clean spatial decision aid, not on feeding the model the same flawed
 composite and hoping it will self-correct.
 
+A related protected-region sketch experiment was inspired by Maximilian Seeth's
+MCoT sketching post. The idea was to have Gemma first author protected regions,
+render those regions as visual constraints, and then ask the correction pass to
+respect them. This was useful exploratory work, but it was not the final
+breakthrough: long prompts caused stalls, shorter prompts sometimes produced
+malformed boxes, and one run still placed the overlay into or near a visible
+protected band. The recovered evidence separates two failure classes: some
+protected-region calls were invalid because Gemma emitted zero-width boxes, but
+at least two runs had valid visible cyan regions that the final measured sticker
+still overlapped. This looks less like the earlier alpha-channel rendering bug
+and more like a missing enforcement step: the harness displayed the model's
+visual scratchpad but did not yet reject final rectangles that touched it. This
+is consistent with the approval-bias pattern seen in rendered-overlay review,
+but it should not be overclaimed as the sole cause. The directly observed lesson
+is that visual scratchpads must be enforced by tools after measured rendering,
+not merely shown back to the model. The writeup should acknowledge the post as
+related inspiration for explicit visual scratchpads, while crediting the
+reliable result to the empirical correction harness and deterministic geometry
+checks.
+
 ## What Worked
 
 ### Strong positive case: side-subject image
