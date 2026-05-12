@@ -173,6 +173,7 @@ allowed_suffixes = {
     if item.strip()
 }
 enable_review = os.environ.get("AILEEN_GEMMA_ENABLE_REVIEW", "1").strip().lower() not in {"0", "false", "off", "no"}
+post_review_mode = os.environ.get("AILEEN_GEMMA_POST_REVIEW_MODE", "result_only_forced_move").strip()
 thinking_values_raw = os.environ.get("AILEEN_GEMMA_THINKING_MODES", "off,on")
 thinking_values = []
 for item in thinking_values_raw.split(","):
@@ -391,6 +392,7 @@ for input_path in inputs:
                     "reuseGemmaEngine": template["reuseGemmaEngine"],
                     "preOverlayGuidanceMode": template["preOverlayGuidanceMode"],
                     "useLayoutGuideProtectedRegions": template["useLayoutGuideProtectedRegions"],
+                    "postReviewMode": post_review_mode,
                     "reviewPass": (
                         template["reviewPass"]
                         if enable_review
@@ -438,11 +440,34 @@ PY
     >/dev/null
 
   local found_results=0
+  local expected_scenarios
+  expected_scenarios="$(python3 - "$config_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(len(config.get("scenarios", [])))
+PY
+)"
   local timeout_seconds="${AILEEN_GEMMA_LAB_TIMEOUT_SECONDS:-900}"
   local poll_iterations=$(( (timeout_seconds + 1) / 2 ))
   local _i
   for _i in $(seq 1 "$poll_iterations"); do
-    if [[ -f "$result_root/results.json" ]]; then
+    if [[ -f "$result_root/results.json" ]] && python3 - "$result_root/results.json" "$expected_scenarios" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    results = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+expected = int(sys.argv[2])
+finished = len(results.get("scenarios", []))
+raise SystemExit(0 if finished >= expected else 1)
+PY
+    then
       found_results=1
       break
     fi
