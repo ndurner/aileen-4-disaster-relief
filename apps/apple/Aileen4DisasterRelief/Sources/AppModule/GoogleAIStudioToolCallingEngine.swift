@@ -144,12 +144,11 @@ actor GoogleAIStudioToolCallingEngine {
         }
 
         if postReviewMode != .none,
-           let currentProducedURL = latestProducedURL,
+           latestProducedURL != nil,
            let currentAssetID = GemmaToolCallingEngine.latestRenderedAssetID(from: responsePayloads) {
             let reviewContext = GemmaToolCallingEngine.latestOverlayReviewContext(from: seenCalls, payloads: responsePayloads)
             let reviewResult = try await runFreshOverlayReview(
                 model: model,
-                renderedURL: currentProducedURL,
                 renderedAssetID: currentAssetID,
                 tooling: tooling,
                 layoutGuideOverride: layoutGuideOverride,
@@ -189,27 +188,16 @@ actor GoogleAIStudioToolCallingEngine {
 
     private func runFreshOverlayReview(
         model: CloudModelOption,
-        renderedURL: URL,
         renderedAssetID: String,
         tooling: AppleMediaTooling,
         layoutGuideOverride: OverlayLayoutGuide,
         reviewContext: OverlayReviewContext?,
         mode: OverlayPostReviewMode
     ) async throws -> (toolCalls: [LiteRTToolCall], toolResponsePayloads: [String], latestProducedURL: URL?, finalText: String, rawResponses: [String], thoughtTraces: [String]) {
-        let renderedAsset = ProductionAssetDescriptor(
-            toolID: renderedAssetID,
-            mediaAsset: MediaAsset(
-                kind: .image,
-                originalURL: renderedURL,
-                localCopyURL: renderedURL,
-                displayName: renderedURL.lastPathComponent
-            )
-        )
         let reviewAssets = try tooling.makeOverlayReviewAssets(
             renderedAssetID: renderedAssetID,
-            renderedURL: renderedURL,
             reviewContext: reviewContext
-        ) + [renderedAsset]
+        )
         let prompt = ReviewToolSchema.reviewPrompt(
             renderedAssetID: renderedAssetID,
             guide: layoutGuideOverride,
@@ -238,13 +226,10 @@ actor GoogleAIStudioToolCallingEngine {
         var rawResponses: [String] = [response.rawResponseJSON]
         var thoughtTraces: [String] = parsed.thoughtText.isEmpty ? [] : [parsed.thoughtText]
         var toolRounds = 0
-        let maxReviewToolRounds = mode.allowsAccept ? 2 : 1
+        let maxReviewToolRounds = 2
 
         while !parsed.toolCalls.isEmpty {
             toolRounds += 1
-            if toolRounds > maxReviewToolRounds {
-                break
-            }
             seenCalls.append(contentsOf: parsed.toolCalls)
             var responses: [MediaToolResult] = []
             for toolCall in parsed.toolCalls {
@@ -253,6 +238,13 @@ actor GoogleAIStudioToolCallingEngine {
             Self.logToolResponses(responses)
             responsePayloads.append(contentsOf: responses.map { ProductionToolSchema.stringify($0.payload) })
             latestProducedURL = responses.compactMap(\.outputURL).last ?? latestProducedURL
+            let shouldRetryRejectedMove = responses.contains { result in
+                guard let status = result.payload["status"] as? String else { return false }
+                return ["invalid_partial_rect", "invalid_rect_bounds", "invalid_upper_retry", "invalid_upper_move"].contains(status)
+            }
+            if !shouldRetryRejectedMove || toolRounds >= maxReviewToolRounds {
+                break
+            }
 
             contents.append(response.modelContentObject.value)
             contents.append(GoogleAIStudioMessageFactory.functionResponseMessage(
@@ -284,30 +276,43 @@ actor GoogleAIStudioToolCallingEngine {
     }
 
     private func reviewContinuationMessage(responses: [MediaToolResult]) throws -> [String: Any]? {
-        guard let latestRendered = responses.last(where: { $0.outputURL != nil }),
-              let renderedURL = latestRendered.outputURL,
-              let renderedAssetID = latestRendered.payload["asset_id"] as? String else {
-            return nil
+        let statuses = responses.compactMap { $0.payload["status"] as? String }
+        if statuses.contains("invalid_partial_rect") {
+            let renderedAssetID = responses.compactMap { $0.payload["asset_id"] as? String }.last ?? "the same rendered asset"
+            let prompt = """
+            Your previous move was rejected because it gave only some coordinates.
+            Call move_text_overlay again on asset_id \(renderedAssetID) with all four integers: x, y, width, height.
+            Do not use top_fraction or anchors in this retry.
+            Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action. Choose plain open background, side margin, sky, or open ground instead.
+            """
+            return try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [])
+        }
+        if statuses.contains("invalid_rect_bounds") {
+            let renderedAssetID = responses.compactMap { $0.payload["asset_id"] as? String }.last ?? "the same rendered asset"
+            let canvasWidth = responses.compactMap { $0.payload["canvas_width"] as? Int }.last ?? 1080
+            let canvasHeight = responses.compactMap { $0.payload["canvas_height"] as? Int }.last ?? 1350
+            let prompt = """
+            Your previous move was rejected because its rectangle was outside the image or too small for readable text.
+            Call move_text_overlay again on asset_id \(renderedAssetID) with x, y, width, height fully inside the \(canvasWidth)x\(canvasHeight) canvas.
+            width and height mean the sticker slot size, not the image size. Use a compact slot, usually width 240-560 and height 120-320.
+            Leave at least 40 px of margin from every image edge; do not put the rectangle flush against the border.
+            If the rejected location was otherwise clear, keep the same x and y and enlarge the slot just enough; do not jump to another part of the image.
+            Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action. Choose plain open background, side margin, sky, or open ground instead.
+            """
+            return try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [])
+        }
+        if statuses.contains("invalid_upper_retry") || statuses.contains("invalid_upper_move") {
+            let renderedAssetID = responses.compactMap { $0.payload["asset_id"] as? String }.last ?? "the same rendered asset"
+            let prompt = """
+            Your previous move was rejected because it used a wide upper banner.
+            Call move_text_overlay again on asset_id \(renderedAssetID) with all four integers: x, y, width, height.
+            Use a compact side/corner slot or open middle rows instead.
+            Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action. Choose plain open background, side margin, sky, or open ground instead.
+            """
+            return try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [])
         }
 
-        let renderedAsset = ProductionAssetDescriptor(
-            toolID: renderedAssetID,
-            mediaAsset: MediaAsset(
-                kind: MediaAsset.kind(for: renderedURL),
-                originalURL: renderedURL,
-                localCopyURL: renderedURL,
-                displayName: renderedURL.lastPathComponent
-            )
-        )
-        let prompt = """
-        Continue the same rendered-overlay review from this updated frame.
-        The attached image is the current rendered state for asset_id \(renderedAssetID).
-        Judge the actual pixels in this attached image.
-        If the current label is excellent and production-ready, stop without another tool call or use accept_overlay_layout if available.
-        If this is a close call, do not accept it.
-        If the label still clearly needs a material placement or style improvement, choose a clean open rectangle yourself and call move_text_overlay on asset_id \(renderedAssetID) with x, y, width, and height.
-        """
-        return try GoogleAIStudioMessageFactory.userMessage(text: prompt, assets: [renderedAsset])
+        return nil
     }
 
     private func allowedFunctionNames(after responses: [MediaToolResult]) -> [String]? {

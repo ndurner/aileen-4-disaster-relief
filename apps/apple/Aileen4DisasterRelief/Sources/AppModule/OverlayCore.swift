@@ -184,12 +184,16 @@ enum OverlayRendering {
         let metrics = styleMetrics(for: style, canvasSize: canvasSize)
         let insets = safeInsets(for: canvasSize)
 
+        let explicitSlot = effectiveRequest.rect.width > 0 && effectiveRequest.rect.height > 0
         let requestedWidth = effectiveRequest.rect.width > 0
             ? effectiveRequest.rect.width
             : canvasSize.width * (effectiveRequest.maxWidthFraction ?? metrics.defaultWidthFraction)
+        let minimumFrameWidth = explicitSlot
+            ? min(requestedWidth, canvasSize.width * metrics.minWidthFraction)
+            : canvasSize.width * metrics.minWidthFraction
         var maxFrameWidth = clamp(
             requestedWidth,
-            lower: canvasSize.width * metrics.minWidthFraction,
+            lower: minimumFrameWidth,
             upper: canvasSize.width * metrics.maxWidthFraction
         )
         let hasBackground = metrics.backgroundColor != nil
@@ -200,15 +204,20 @@ enum OverlayRendering {
             ? max(metrics.minimumVerticalPadding, canvasSize.height * metrics.verticalPaddingFactor)
             : 0
         var maxTextWidth = max(80, maxFrameWidth - (horizontalPadding * 2))
-        let maxTextHeight = canvasSize.height * metrics.maxHeightFraction
+        let maxTextHeight = explicitSlot
+            ? max(40, effectiveRequest.rect.height - (verticalPadding * 2))
+            : canvasSize.height * metrics.maxHeightFraction
 
         if let targetLineCount = effectiveRequest.targetLineCount,
            targetLineCount > 0 {
+            let minimumTextWidth = explicitSlot
+                ? min(maxTextWidth, 80)
+                : max(80, (canvasSize.width * metrics.minWidthFraction) - (horizontalPadding * 2))
             maxTextWidth = resolvedTextWidth(
                 targetLineCount: targetLineCount,
                 text: effectiveRequest.text,
                 metrics: metrics,
-                minTextWidth: max(80, (canvasSize.width * metrics.minWidthFraction) - (horizontalPadding * 2)),
+                minTextWidth: minimumTextWidth,
                 maxTextWidth: maxTextWidth,
                 maxTextHeight: maxTextHeight
             )
@@ -274,6 +283,9 @@ enum OverlayRendering {
             insets: insets,
             metrics: metrics
         )
+        let minimumTop = effectiveRequest.rect.height > 0
+            ? 0
+            : canvasSize.height * metrics.minTopFraction
         let resolvedTop = max(
             resolvedTop(
                 request: effectiveRequest,
@@ -281,18 +293,18 @@ enum OverlayRendering {
                 canvasSize: canvasSize,
                 metrics: metrics
             ),
-            canvasSize.height * metrics.minTopFraction
+            minimumTop
         )
         let origin = CGPoint(
             x: clamp(
                 requestedCenterX - (frameSize.width / 2),
-                lower: insets.left,
-                upper: canvasSize.width - insets.right - frameSize.width
+                lower: explicitSlot ? 0 : insets.left,
+                upper: explicitSlot ? canvasSize.width - frameSize.width : canvasSize.width - insets.right - frameSize.width
             ),
             y: clamp(
                 resolvedTop,
-                lower: insets.top,
-                upper: canvasSize.height - insets.bottom - frameSize.height
+                lower: explicitSlot ? 0 : insets.top,
+                upper: explicitSlot ? canvasSize.height - frameSize.height : canvasSize.height - insets.bottom - frameSize.height
             )
         )
         let frame = CGRect(origin: origin, size: frameSize).integral
@@ -646,12 +658,31 @@ enum OverlayRendering {
             let font = platformFont(preferredNames: preferredNames, size: fontSize)
             let attributed = attributedText(text: text, font: font, metrics: metrics)
             let measured = measuredLayout(for: attributed, maxWidth: maxTextWidth)
-            if measured.size.height <= maxTextHeight {
+            let longestTokenWidth = longestTokenWidth(in: text, font: font, metrics: metrics)
+            if measured.size.height <= maxTextHeight && longestTokenWidth <= maxTextWidth {
                 return font
             }
             fontSize -= 2
         }
         return platformFont(preferredNames: preferredNames, size: minimumSize)
+    }
+
+    private static func longestTokenWidth(
+        in text: String,
+        font: OverlayPlatformFont,
+        metrics: StyleMetrics
+    ) -> CGFloat {
+        let tokens = text
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .map(String.init)
+        let candidates = tokens.isEmpty ? [text] : tokens
+
+        return candidates.reduce(CGFloat(0)) { longest, token in
+            let attributed = attributedText(text: token, font: font, metrics: metrics)
+            let line = CTLineCreateWithAttributedString(attributed as CFAttributedString)
+            let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+            return max(longest, ceil(width))
+        }
     }
 
     private static func attributedText(

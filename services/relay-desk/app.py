@@ -817,7 +817,7 @@ Placement policy:
 - Avoid placing the text or sticker background directly across the main subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or primary silhouette.
 - Any human face, head, hair, or profile is blocked, even when it is partly cropped at the image edge.
 - A dark shirt, hair mass, or shoulder is not empty space just because it is visually plain.
-- Upper placements are allowed when they feel modern and do not visibly cover the face or central action. If any face or profile appears in the upper rows, do not use an upper-center sticker.
+- Upper placements are allowed when they feel modern and do not visibly cover the face or central action. If any face/profile or hair reaches the upper rows, do not use an upper-center or overhead sticker; choose the opposite open side instead.
 - For upper placements, prefer exact x, y, width, and height so the full box stays in clean sky/background instead of drifting down onto story objects.
 - For animal-care scenes with a person on one side and an animal low in frame, prefer a compact side sticker in the open middle background between them.
 - Lower placements are allowed only when the lower area is genuinely open. Do not put a bottom sticker over an animal, hands, tools, story evidence, or the lower half of the main action.
@@ -885,7 +885,7 @@ PRODUCTION_TOOLS = [
         "type": "function",
         "function": {
             "name": "add_text_overlay",
-            "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not directly across the subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. The white sticker background counts as overlay area. Actively look for empty space before choosing a default band: check top sky, side margins, corners, open ground, water, wall, and plain background. Prefer open space over subject-obscuring placement. Do not treat a dark shirt, hair, shoulder, story evidence, or plain-looking body area as empty space. Do not treat the bottom as automatically safe: if an animal, hands, tools, story evidence, or the main action sits near the lower edge, choose upper, side, or corner space instead. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action, but compare them against lower, side, and corner options first. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. Prefer exact x, y, width, and height when choosing side or corner open space. If you provide x, y, width, and height, the renderer treats that rectangle as an available slot in the rendered frame. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
+            "description": "Draw a publication-ready text overlay on a source asset such as asset_1 or on an existing rendered asset such as rendered_1. asset_id must be exactly one listed ID, for example asset_1 or rendered_2; never include commas, overlay_text, or any other argument inside asset_id. For a single source asset, call this directly on that source asset; the app renders the source onto the output canvas before drawing text. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Place overlays in free space around the subject, not directly across the subject's face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. The white sticker background counts as overlay area. Actively look for empty space before choosing a default band: check top sky, side margins, corners, open ground, water, wall, and plain background. Prefer open space over subject-obscuring placement. Do not treat a dark shirt, hair, shoulder, story evidence, or plain-looking body area as empty space. Do not treat the bottom as automatically safe: if an animal, hands, tools, story evidence, or the main action sits near the lower edge, choose upper, side, or corner space instead. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action, but compare them against lower, side, and corner options first. The renderer can size the overlay from normalized placement hints such as top_fraction, max_width_fraction, target_line_count, horizontal_anchor, and vertical_anchor. Prefer exact x, y, width, and height when choosing side or corner open space. If you provide x, y, width, and height, the renderer treats that rectangle as an available slot in the rendered frame. Do not mix exact coordinates with top_fraction or anchors. If you include any one of x, y, width, or height, include all four; otherwise omit all four. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. The final size can vary because the renderer measures wrapped text. Use exact source or returned asset IDs, and if you need another overlay, chain from the most recently returned rendered asset ID.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -897,10 +897,10 @@ PRODUCTION_TOOLS = [
                     "target_line_count": {"type": "integer"},
                     "horizontal_anchor": {"type": "string", "enum": ["left", "center", "right"]},
                     "vertical_anchor": {"type": "string", "enum": ["top", "center", "bottom"]},
-                    "x": {"type": "integer"},
-                    "y": {"type": "integer"},
-                    "width": {"type": "integer"},
-                    "height": {"type": "integer"},
+                    "x": {"type": "integer", "description": "Left edge of the open placement slot in pixels."},
+                    "y": {"type": "integer", "description": "Top edge of the open placement slot in pixels."},
+                    "width": {"type": "integer", "description": "Width of the sticker slot in pixels, not the full image width."},
+                    "height": {"type": "integer", "description": "Height of the sticker slot in pixels, not the full image height."},
                 },
                 "required": ["asset_id", "overlay_text"],
             },
@@ -910,7 +910,7 @@ PRODUCTION_TOOLS = [
         "type": "function",
         "function": {
             "name": "move_text_overlay",
-            "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay needs a material placement or style change, and always use it when the current label or sticker background sits directly across a face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from direct subject obstruction rather than closer to it. Prefer free space and frame edges over subject-obscuring placement. Do not treat a dark shirt, hair, shoulder, story evidence, or plain-looking body area as empty space. Bottom is not automatically safe; move away from the bottom when the lower area contains an animal, hands, tools, story evidence, or the main action. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action. In the correction review, use the coordinate scaffold to choose your own exact rectangle. Prefer exact x, y, width, and height when moving into open space. Do not mix exact coordinates with top_fraction or anchors. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
+            "description": "Replace the most recent overlay on an already rendered asset after inspecting the rendered preview. asset_id must be exactly one returned rendered asset ID, for example rendered_2; never include commas, overlay_text, or any other argument inside asset_id. Use this when the current overlay needs a material placement or style change, and always use it when the current label or sticker background sits directly across a face, head, hair, shoulder, torso, body, hands, animal body, tool interaction, story evidence, or main silhouette. Story evidence includes plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, and damage that explain the scene. Prefer style sticker for almost all main overlay text and style tag only for short secondary labels. Legacy styles headline and caption are accepted but render like sticker. Move overlays away from direct subject obstruction rather than closer to it. Prefer free space and frame edges over subject-obscuring placement. Do not treat a dark shirt, hair, shoulder, story evidence, or plain-looking body area as empty space. Bottom is not automatically safe; move away from the bottom when the lower area contains an animal, hands, tools, story evidence, or the main action. For sunset, storm, smoke, or horizon scenes, use quiet sky around the dramatic band, not the red/orange/yellow/cloud band itself; if normalized hints drift into that band, use exact coordinates. Upper placements are allowed when they feel modern and do not visibly cover the face, head, hair, shoulder, torso, story evidence, or central action. In the correction review, use the coordinate scaffold to choose your own exact rectangle. Prefer exact x, y, width, and height when moving into open space. Do not mix exact coordinates with top_fraction or anchors. If you include any one of x, y, width, or height, include all four; otherwise omit all four. For sticker text longer than five words, prefer target_line_count 2 or 3 rather than 1; if the clean slot would make four lines, shorten overlay_text. This revises the latest overlay instead of stacking a second one. You may omit overlay_text or style to reuse the previous overlay content and style. Use normalized hints or a slot exactly as with add_text_overlay.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -922,12 +922,37 @@ PRODUCTION_TOOLS = [
                     "target_line_count": {"type": "integer"},
                     "horizontal_anchor": {"type": "string", "enum": ["left", "center", "right"]},
                     "vertical_anchor": {"type": "string", "enum": ["top", "center", "bottom"]},
-                    "x": {"type": "integer"},
-                    "y": {"type": "integer"},
-                    "width": {"type": "integer"},
-                    "height": {"type": "integer"},
+                    "x": {"type": "integer", "description": "Left edge of the open placement slot in pixels."},
+                    "y": {"type": "integer", "description": "Top edge of the open placement slot in pixels."},
+                    "width": {"type": "integer", "description": "Width of the sticker slot in pixels, not the full image width."},
+                    "height": {"type": "integer", "description": "Height of the sticker slot in pixels, not the full image height."},
                 },
                 "required": ["asset_id"],
+            },
+        },
+    },
+]
+
+
+REVIEW_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "move_text_overlay",
+            "description": "Revise the current overlay on the rendered asset when the placement should materially change. Choose one open sticker slot. x and y are the slot's top-left corner. width and height are the sticker slot size, not the image size.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "asset_id": {"type": "string"},
+                    "overlay_text": {"type": "string"},
+                    "style": {"type": "string", "enum": ["auto", "sticker", "headline", "caption", "tag"]},
+                    "target_line_count": {"type": "integer"},
+                    "x": {"type": "integer", "description": "Left edge of the open slot in pixels. Use 0 to 1079."},
+                    "y": {"type": "integer", "description": "Top edge of the open slot in pixels. Use 0 to 1349."},
+                    "width": {"type": "integer", "description": "Open sticker slot width in pixels. Usually 240 to 560; never the full image width."},
+                    "height": {"type": "integer", "description": "Open sticker slot height in pixels. Usually 120 to 320; never the full image height."},
+                },
+                "required": ["asset_id", "x", "y", "width", "height"],
             },
         },
     },
@@ -1238,16 +1263,19 @@ Create one short Instagram-style overlay line for the attached media.
 Placement checklist:
 1. Find faces, heads, hair, shoulders, torsos, animals, hands, tools, and story evidence such as plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, or damage.
 2. Find empty space: sky, wall, water, open ground, side margin, or corner.
-3. Do not put the text box or sticker background directly across faces, heads, hair, shoulders, torsos, animals, hands, tools, story evidence, or action.
-4. Edge faces, profile faces, hair, and head silhouettes count as blocked subject area.
-5. Upper text is OK only if it does not touch any face, story evidence, or main action.
-6. If using sky/background, keep the entire sticker box there; do not let its lower edge cover guards, stakes, enclosures, hands, animals, or other story objects.
-7. Bottom text is OK only if the bottom area is open.
-8. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
-9. If a face/profile is in the top rows, do not choose an upper-center band.
-10. If top or bottom would cover the subject or story evidence, use side or corner open space.
-11. Keep overlay_text short, usually 3 to 6 words. For sticker text longer than five words, use two or three lines.
-12. If a corner or side sticker would need four text lines, shorten overlay_text to 3 to 5 words instead of accepting a tall block.
+3. A corner is open only when that corner is visibly empty. If a person, hair, shoulder, plant guard, or story object fills that side, the corner is blocked.
+4. Do not put the text box or sticker background directly across faces, heads, hair, shoulders, torsos, animals, hands, tools, story evidence, or action.
+5. In planting, rescue, or care scenes, do not move the text toward hands, tools, plants, guards, animals, paperwork, or the main action. Move away from them into plain open space.
+6. If a person or animal occupies one side of the image, prefer the opposite open side. Do not place the sticker above or beside that same side's hair, head, shoulder, or body.
+7. Edge faces, profile faces, hair, and head silhouettes count as blocked subject area.
+8. Upper text is OK only if it does not touch any face, story evidence, or main action.
+9. If using sky/background, keep the entire sticker box there; do not let its lower edge cover guards, stakes, enclosures, hands, animals, bright sunset bands, skylines, or other story objects.
+10. Bottom text is OK only if the bottom area is open.
+11. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
+12. If a face/profile or hair reaches the top rows, do not choose an upper-center or overhead sticker; choose the opposite open side instead.
+13. If top or bottom would cover the subject or story evidence, use side or corner open space.
+14. Keep overlay_text short, usually 3 to 6 words. For sticker text longer than five words, use two or three lines.
+15. If a corner or side sticker would need four text lines, shorten overlay_text to 3 to 5 words instead of accepting a tall block.
 
 Tool-call rules:
 - When tool use is available, do not return the overlay copy as plain text.
@@ -1690,6 +1718,35 @@ class RelayMediaTooling:
         if asset.latest_overlay_request is not None:
             return self.move_text_overlay(arguments)
 
+        partial_rect_error = partial_explicit_rect_error(arguments)
+        if partial_rect_error:
+            if not tolerates_partial_rect_for_initial_overlay(arguments):
+                return MediaToolResult(
+                    name="add_text_overlay",
+                    payload={
+                        "status": "invalid_partial_rect",
+                        "asset_id": asset.tool_id,
+                        "accepted": False,
+                        "error": partial_rect_error,
+                        "required_coordinates": ["x", "y", "width", "height"],
+                    },
+                )
+
+        rect_bounds_error = explicit_rect_bounds_error(arguments, asset.canvas_size)
+        if rect_bounds_error:
+            return MediaToolResult(
+                name="add_text_overlay",
+                payload={
+                    "status": "invalid_rect_bounds",
+                    "asset_id": asset.tool_id,
+                    "accepted": False,
+                    "error": rect_bounds_error,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                    "canvas_width": asset.canvas_size[0],
+                    "canvas_height": asset.canvas_size[1],
+                },
+            )
+
         request = overlay_request_from_arguments(arguments, defaulting_to=None, require_text=True)
         return self.render_overlay_result("add_text_overlay", asset, asset.tool_id, request, duplicate_asset=asset)
 
@@ -1699,7 +1756,17 @@ class RelayMediaTooling:
             raise gr.Error("move_text_overlay requires asset_id.")
         current_asset = self.resolve_asset(asset_id)
         if current_asset.latest_overlay_request is None:
-            raise gr.Error("move_text_overlay requires an asset with an existing overlay.")
+            if arguments.get("overlay_text"):
+                return self.add_text_overlay(arguments)
+            return MediaToolResult(
+                name="move_text_overlay",
+                payload={
+                    "status": "invalid_missing_overlay",
+                    "asset_id": current_asset.tool_id,
+                    "accepted": False,
+                    "error": "move_text_overlay requires an asset with an existing overlay. Use add_text_overlay first or include overlay_text.",
+                },
+            )
         partial_rect_error = partial_explicit_rect_error(arguments)
         if partial_rect_error:
             self.assets_with_rejected_partial_rect.add(current_asset.tool_id)
@@ -1711,6 +1778,21 @@ class RelayMediaTooling:
                     "accepted": False,
                     "error": partial_rect_error,
                     "required_coordinates": ["x", "y", "width", "height"],
+                },
+                output_path=current_asset.path,
+            )
+        rect_bounds_error = explicit_rect_bounds_error(arguments, current_asset.canvas_size)
+        if rect_bounds_error:
+            return MediaToolResult(
+                name="move_text_overlay",
+                payload={
+                    "status": "invalid_rect_bounds",
+                    "asset_id": current_asset.tool_id,
+                    "accepted": False,
+                    "error": rect_bounds_error,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                    "canvas_width": current_asset.canvas_size[0],
+                    "canvas_height": current_asset.canvas_size[1],
                 },
                 output_path=current_asset.path,
             )
@@ -1864,6 +1946,7 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
     payloads: list[dict[str, Any]] = []
     latest_output_path: str | None = None
     tool_rounds = 0
+    pending_review_tool_call = False
 
     while tool_calls:
         tool_rounds += 1
@@ -1878,6 +1961,11 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
             break
         statuses = [result.payload.get("status") for result in results if result.payload.get("status")]
         if statuses and all(status == "skipped_duplicate" for status in statuses):
+            break
+        if pending_review_tool_call and not any(
+            status in {"invalid_partial_rect", "invalid_rect_bounds", "invalid_upper_retry", "invalid_upper_move"}
+            for status in statuses
+        ):
             break
         messages.append(
             {
@@ -1898,23 +1986,20 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
                         clean_reference_path = source_asset.path
                 except Exception:
                     clean_reference_path = None
-            grid_path = render_coordinate_grid(latest_output_path)
             review_content: list[dict[str, Any]] = []
             if clean_reference_path:
-                outline_path = render_current_overlay_outline(clean_reference_path, latest_payload)
-                review_content.append({"type": "image", "image": open_image(outline_path)})
-            review_content.extend(
-                [
-                    {"type": "image", "image": open_image(latest_output_path)},
-                    {"type": "image", "image": open_image(grid_path)},
-                    {
-                        "type": "text",
-                        "text": rendered_overlay_review_prompt(
-                            results,
-                            includes_clean_reference=clean_reference_path is not None,
-                        ),
-                    },
-                ]
+                guide_path = render_current_overlay_review_guide(clean_reference_path, latest_payload)
+            else:
+                guide_path = render_coordinate_grid(latest_output_path)
+            review_content.append({"type": "image", "image": open_image(guide_path)})
+            review_content.append(
+                {
+                    "type": "text",
+                    "text": rendered_overlay_review_prompt(
+                        results,
+                        includes_clean_reference=clean_reference_path is not None,
+                    ),
+                }
             )
             messages.append(
                 {
@@ -1922,7 +2007,9 @@ def run_visual_workflow(package: dict[str, Any], assets: list[ProductionAsset], 
                     "content": review_content,
                 }
             )
-        generation = generate_response(messages, PRODUCTION_TOOLS, sample=False)
+        review_tools = REVIEW_TOOLS if latest_output_path else PRODUCTION_TOOLS
+        pending_review_tool_call = review_tools is REVIEW_TOOLS
+        generation = generate_response(messages, review_tools, sample=False)
         raw_responses.append(generation.raw_text)
         if generation.thought_text:
             thought_traces.append(generation.thought_text)
@@ -1959,46 +2046,53 @@ def rendered_overlay_review_prompt(
         box_line = f"\nCurrent label box: left={x}, top={y}, width={width}, height={height} on the 1080x1350 image."
     error_line = ""
     if status == "invalid_partial_rect":
-        error_line = "\nYour previous move was rejected because it gave only some coordinates. Call move_text_overlay again with all four integers: x, y, width, height. Avoid top_fraction and anchors in this retry."
+        error_line = "\nYour previous move was rejected because it gave only some coordinates. Call move_text_overlay again with all four integers: x, y, width, height. Avoid top_fraction and anchors in this retry. Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action; choose plain open background, side margin, sky, or open ground instead."
+    elif status == "invalid_rect_bounds":
+        error_line = "\nYour previous move was rejected because its rectangle was outside the image or too small for readable text. Call move_text_overlay again with x, y, width, height fully inside the 1080x1350 canvas. width and height mean sticker slot size, not image size. Use a compact slot, usually width 240-560 and height 120-320. Leave at least 40 px of margin from every image edge; do not put the rectangle flush against the border. If the rejected location was otherwise clear, keep the same x and y and enlarge the slot just enough; do not jump to another part of the image. Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action; choose plain open background, side margin, sky, or open ground instead."
     elif status in {"invalid_upper_retry", "invalid_upper_move"}:
-        error_line = "\nYour previous move was rejected because it used a wide upper banner. Call move_text_overlay again with all four integers. If using the upper area, use a compact side/corner box under 560 px wide and away from faces; otherwise move to open middle or lower-middle space."
+        error_line = "\nYour previous move was rejected because it used a wide upper banner. Call move_text_overlay again with all four integers. If using the upper area, use a compact side/corner box under 560 px wide and away from faces; otherwise move to open middle or lower-middle space. Do not move toward hands, tools, plants, guards, animals, paperwork, or the main action."
     image_order = (
-        "The first image is the clean frame with a red outline marking the current sticker rectangle. The second image is the current rendered label. The third image is a coordinate scaffold for the same render:"
+        "The attached image is a clean review guide. The red rounded rectangle marks the current full sticker box. Yellow grid lines and edge labels show pixel coordinates:"
         if includes_clean_reference
-        else "The first image is the current rendered label. The second image is a coordinate scaffold for the same render:"
+        else "The attached image is a coordinate review guide for the current rendered label:"
     )
     return f"""
-Check the attached rendered image.
+Check the attached review image.
 {image_order}
-- yellow cells A1-F6 show broad regions
-- blue center dots show pixel anchors as x,y
+- yellow lines show pixel boundaries
+- top edge labels show x coordinates; left edge labels show y coordinates
 
-Review the actual pixels.
-Judge the whole sticker box, not just the black text letters.
-If a red outline image is attached, judge the full red-outlined rectangle on the clean frame: top edge, bottom edge, left edge, and right edge. If any part of that rectangle touches or covers hair, head, face, shoulder, torso, hands, animal, tools, story evidence, or action, move the label.
-Story evidence is the visible thing that explains the update: plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, damage, or similar evidence.
-Plant guards and vertical stakes are not empty background, even if the text itself is above them.
-For scenic images, do not cover the most distinctive sunset, horizon, skyline, smoke, water, cloud, fire, or damage band; use quieter negative space around it.
-If the current label touches the red/orange/yellow sunset band while darker quiet sky is available above, move it upward or sideways with exact coordinates.
-Accept {rendered_id} only if the label is already publishable, shows the complete overlay text, and the whole white sticker background avoids every face/profile, head, hair, shoulder, torso, body, animal, hands, tools, story evidence, and main action.
-Move {rendered_id} if the label is truncated, missing words, or if any part of the sticker background covers or crowds a face/profile, head, hair, shoulder, torso, body, animal, hands, tools, story evidence, or action.
-The earlier placement is only a draft. Do not approve it just because it already exists.
-Close call means move. Accept only when you would hand off the image unchanged for production.
-Dark clothing, hair, and shoulders are not empty space.
+Determine protected areas first: face/profile, head, hair, shoulder, torso, hands, animals, tools, plant guards, enclosures, paperwork, skyline, sunset band, smoke, floodwater, storm clouds, fire, damage, and main action.
+Judge the whole red sticker box, not just the letters.
+Move {rendered_id} if the red box overlaps, touches, crowds, or competes with any protected area.
+Call move_text_overlay exactly once.
+If the red box is excellent, keep it by using the same current rectangle.
+A safe current side/corner sticker in real open background is excellent. Keep it; do not move it for aesthetics alone.
+If it is unsafe, crowded, or clearly weaker than unused open space, choose a better open rectangle.
+Close call means move. The earlier placement is only a draft.
 
 Simple move method:
-1. Pick the clearest open rectangle from the scaffold. Prefer open background, grass, wall, sky, water, side margin, or corner.
+1. Pick the clearest open rectangle from the grid. Prefer open background, grass, wall, sky, water, side margin, or corner.
 2. Keep the rectangle off every face/profile, head, hair, shoulder, torso, animal, hands, tools, story evidence, and action area.
-3. If the current label is wide, make the correction smaller instead of reusing the same wide band.
-4. Call move_text_overlay with exactly x, y, width, height. Use all four integers. Do not use top_fraction or anchors for the correction.
+3. Call move_text_overlay with exactly x, y, width, height. Use all four integers.
+4. width and height mean sticker slot size, not image size. A compact sticker slot is usually 240-560 wide and 120-320 tall.
+5. Leave at least 40 px of margin from every image edge; never put the sticker flush against a border.
+6. To keep a good current red box that is slightly smaller than the slot guidance, reuse the same x and y and round width up to at least 240 and height up to at least 120.
+7. If the clean slot would make the old text a tall four-line block, shorten overlay_text to 2-4 plain words.
 
 Placement taste:
 - Modern side, corner, or lower-middle placements are welcome when they use real free space.
 - For long text in side or corner space, prefer a compact 3-line sticker over a wide 1-line or 2-line banner.
-- If a corner or side label needs four lines or feels like a tall block, shorten overlay_text and keep the same meaning.
+- For a top-row slot near a person, beside the head is safer than above the head.
+- Do not let the rectangle share the head/hair x-range unless its bottom edge is clearly above all hair with visible empty space between.
+- If you are unsure where the head/hair ends, use the opposite open side instead.
+- If a person or animal occupies one side, use the opposite open side instead of that same side's corner.
+- A corner is open only when the corner is visibly empty. If a person, hair, shoulder, plant guard, or story object fills that side, that corner is blocked.
 - Do not use a wide top banner when a face/profile is in rows 1 or 2.
 - Do not put the label at the bottom by habit; bottom is good only when the lower area is open.
-- In animal-care scenes with a person on one side and an animal low in frame, open middle background or grass can be better than the top.{box_line}{error_line}
+- In animal-care scenes with a person on one side and an animal low in frame, avoid lower corners and lower-center. Prefer open upper/middle background, wall, mesh, or grass away from animal, paperwork, and hands.
+- In planting, rescue, or care scenes, do not move toward the hands, tools, plants, guard, animal, paperwork, or action. Move away from them into plain open space.
+- In sunset or horizon scenes, keep the whole rectangle out of the red/orange/yellow band and skyline. Use quiet blue/gray dark sky near the top or side; red/orange/yellow cloud color under the rectangle means move higher. In most sunset frames, choose y around 70-180 and avoid y >= 250. y + height must stay above the bright band.{box_line}{error_line}
 """.strip()
 
 
@@ -2070,16 +2164,18 @@ def overlay_request_from_arguments(
         raise gr.Error("move_text_overlay requires existing overlay text or a new overlay_text.")
 
     style = str(arguments.get("style") or (defaulting_to.style if defaulting_to else "auto")).strip() or "auto"
-    horizontal_anchor = str(
-        arguments.get("horizontal_anchor") or (defaulting_to.horizontal_anchor if defaulting_to else "center")
-    ).strip()
-    vertical_anchor = str(
-        arguments.get("vertical_anchor") or (defaulting_to.vertical_anchor if defaulting_to else "top")
-    ).strip()
-
     explicit_rect_keys = ["x", "y", "width", "height"]
     has_complete_rect = all(key in arguments for key in explicit_rect_keys)
-    has_normalized_override = any(key in arguments for key in ["top_fraction", "max_width_fraction", "target_line_count"])
+    has_normalized_override = any(
+        key in arguments
+        for key in ["top_fraction", "max_width_fraction", "target_line_count", "horizontal_anchor", "vertical_anchor"]
+    )
+    horizontal_anchor = str(
+        arguments.get("horizontal_anchor") or ("left" if has_complete_rect else (defaulting_to.horizontal_anchor if defaulting_to else "center"))
+    ).strip()
+    vertical_anchor = str(
+        arguments.get("vertical_anchor") or ("top" if has_complete_rect else (defaulting_to.vertical_anchor if defaulting_to else "top"))
+    ).strip()
     rect = None
     if has_complete_rect:
         rect = (
@@ -2110,6 +2206,38 @@ def partial_explicit_rect_error(arguments: dict[str, Any]) -> str | None:
         return None
     missing = [key for key in explicit_rect_keys if key not in arguments]
     return f"Partial rectangle provided. Missing: {', '.join(missing)}."
+
+
+def tolerates_partial_rect_for_initial_overlay(arguments: dict[str, Any]) -> bool:
+    explicit_rect_keys = ["x", "y", "width", "height"]
+    provided = [key for key in explicit_rect_keys if key in arguments]
+    if not provided or len(provided) == len(explicit_rect_keys):
+        return False
+    return any(
+        key in arguments
+        for key in ["top_fraction", "max_width_fraction", "target_line_count", "horizontal_anchor", "vertical_anchor"]
+    )
+
+
+def explicit_rect_bounds_error(arguments: dict[str, Any], canvas_size: tuple[int, int]) -> str | None:
+    explicit_rect_keys = ["x", "y", "width", "height"]
+    if not all(key in arguments for key in explicit_rect_keys):
+        return None
+    x = as_float_optional(arguments.get("x")) or 0
+    y = as_float_optional(arguments.get("y")) or 0
+    width = as_float_optional(arguments.get("width")) or 0
+    height = as_float_optional(arguments.get("height")) or 0
+    if width <= 0 or height <= 0:
+        return "Exact rectangle width and height must be positive."
+    if width < 240 or height < 60:
+        return "Exact rectangle is too small for readable sticker text. Use width at least 240 and height at least 60."
+    canvas_width, canvas_height = canvas_size
+    edge_margin = 40
+    if x < edge_margin or y < edge_margin or x + width > canvas_width - edge_margin or y + height > canvas_height - edge_margin:
+        return "Exact rectangle must leave at least 40 px of margin from every canvas edge."
+    if x < 0 or y < 0 or x + width > canvas_width or y + height > canvas_height:
+        return f"Exact rectangle must fit fully inside the {canvas_width}x{canvas_height} canvas."
+    return None
 
 
 def upper_row_retry_error(arguments: dict[str, Any], after_rejected_partial_rect: bool) -> str | None:
@@ -2197,10 +2325,7 @@ def render_coordinate_grid(image_path: str) -> str:
     row_height = height / rows
     line_fill = (255, 218, 64, 150)
     label_fill = (16, 20, 24, 235)
-    label_bg = (255, 255, 255, 210)
-    font = load_font(max(22, int(width * 0.026)), bold=True)
     axis_font = load_font(max(16, int(width * 0.018)), bold=True)
-    anchor_font = load_font(max(14, int(width * 0.015)), bold=True)
 
     for index in range(columns + 1):
         x = int(round(index * column_width))
@@ -2229,41 +2354,6 @@ def render_coordinate_grid(image_path: str) -> str:
         draw.rounded_rectangle(label_rect, radius=6, fill=(255, 255, 255, 190))
         draw.text((label_rect[0] + 6, label_rect[1] + 4), axis_label, font=axis_font, fill=label_fill)
 
-    for row in range(rows):
-        for column in range(columns):
-            label = f"{chr(ord('A') + column)}{row + 1}"
-            left = int(round(column * column_width))
-            top = int(round(row * row_height))
-            center_x = int(round(left + column_width / 2))
-            center_y = int(round(top + row_height / 2))
-            text_bbox = draw.textbbox((0, 0), label, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-            pad_x = 8
-            pad_y = 5
-            label_rect = (
-                left + 8,
-                top + 8,
-                left + 8 + text_width + pad_x * 2,
-                top + 8 + text_height + pad_y * 2,
-            )
-            draw.rounded_rectangle(label_rect, radius=8, fill=label_bg)
-            draw.text((label_rect[0] + pad_x, label_rect[1] + pad_y), label, font=font, fill=label_fill)
-
-            anchor_label = f"{center_x},{center_y}"
-            anchor_bbox = draw.textbbox((0, 0), anchor_label, font=anchor_font)
-            anchor_width = anchor_bbox[2] - anchor_bbox[0]
-            anchor_height = anchor_bbox[3] - anchor_bbox[1]
-            anchor_rect = (
-                int(center_x - anchor_width / 2 - 6),
-                int(center_y + 8),
-                int(center_x + anchor_width / 2 + 6),
-                int(center_y + 8 + anchor_height + 6),
-            )
-            draw.ellipse((center_x - 6, center_y - 6, center_x + 6, center_y + 6), fill=(0, 160, 255, 220))
-            draw.rounded_rectangle(anchor_rect, radius=6, fill=(255, 255, 255, 178))
-            draw.text((anchor_rect[0] + 6, anchor_rect[1] + 3), anchor_label, font=anchor_font, fill=(0, 80, 150, 245))
-
     output_dir = Path(tempfile.mkdtemp(prefix="aileen-relay-grid-"))
     output_path = output_dir / "coordinate-grid.jpg"
     canvas.convert("RGB").save(output_path, quality=90)
@@ -2272,7 +2362,6 @@ def render_coordinate_grid(image_path: str) -> str:
 
 def render_current_overlay_outline(image_path: str, payload: dict[str, Any]) -> str:
     canvas = open_image(image_path).convert("RGBA")
-    draw = ImageDraw.Draw(canvas, "RGBA")
     try:
         left = int(payload.get("x"))
         top = int(payload.get("y"))
@@ -2283,6 +2372,8 @@ def render_current_overlay_outline(image_path: str, payload: dict[str, Any]) -> 
     right = left + max(width, 1)
     bottom = top + max(height, 1)
     outline_width = max(6, canvas.width // 150)
+    overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay, "RGBA")
     draw.rounded_rectangle(
         (left, top, right, bottom),
         radius=32,
@@ -2294,10 +2385,16 @@ def render_current_overlay_outline(image_path: str, payload: dict[str, Any]) -> 
         outline=(255, 38, 38, 245),
         width=outline_width,
     )
+    canvas = Image.alpha_composite(canvas, overlay)
     output_dir = Path(tempfile.mkdtemp(prefix="aileen-relay-outline-"))
     output_path = output_dir / "overlay-outline.jpg"
     canvas.convert("RGB").save(output_path, quality=90)
     return str(output_path)
+
+
+def render_current_overlay_review_guide(image_path: str, payload: dict[str, Any]) -> str:
+    grid_path = render_coordinate_grid(image_path)
+    return render_current_overlay_outline(grid_path, payload)
 
 
 def render_synthetic_disclosure_badge(image_path: str) -> str:
@@ -2351,7 +2448,7 @@ def resolve_overlay_frame(
     slot_rect = request.rect if request.rect and request.rect[2] > 0 and request.rect[3] > 0 else None
     if slot_rect:
         slot_x, slot_y, slot_width, slot_height = request.rect
-        max_frame_width = int(clamp(slot_width, canvas_size[0] * 0.34, canvas_size[0] * 0.78))
+        max_frame_width = int(max(120, min(slot_width, canvas_size[0] * 0.78)))
         top = int(slot_y)
     else:
         max_frame_width = int(canvas_size[0] * max_width_fraction)
@@ -2360,13 +2457,23 @@ def resolve_overlay_frame(
 
     pad_x = 26 if style == "tag" else 46
     pad_y = 18 if style == "tag" else 30
-    max_text_width = max(120, max_frame_width - (pad_x * 2))
-    wrapped = wrap_overlay_text(request.text, font, max_text_width, target_lines)
-    bbox = draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=4, align="center")
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    box_width = min(max_frame_width, text_width + pad_x * 2)
-    box_height = text_height + pad_y * 2
+    minimum_font_size = 18 if style == "tag" else 30
+    while True:
+        max_text_width = max(80, max_frame_width - (pad_x * 2))
+        if longest_word_width(request.text, font) > max_text_width and font_size > minimum_font_size:
+            font_size -= 2
+            font = load_font(font_size, bold=True)
+            continue
+        wrapped = wrap_overlay_text(request.text, font, max_text_width, target_lines)
+        bbox = draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=4, align="center")
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        box_width = min(max_frame_width, text_width + pad_x * 2)
+        box_height = text_height + pad_y * 2
+        if not slot_rect or box_height <= slot_rect[3] or font_size <= minimum_font_size:
+            break
+        font_size -= 2
+        font = load_font(font_size, bold=True)
 
     if slot_rect:
         slot_x, slot_y, slot_width, slot_height = slot_rect
@@ -2398,8 +2505,12 @@ def resolve_overlay_frame(
     else:
         box_y = top
 
-    box_x = int(clamp(box_x, canvas_size[0] * 0.04, canvas_size[0] - box_width - canvas_size[0] * 0.04))
-    box_y = int(clamp(box_y, canvas_size[1] * 0.08, canvas_size[1] - box_height - canvas_size[1] * 0.08))
+    if slot_rect:
+        box_x = int(clamp(box_x, 0, canvas_size[0] - box_width))
+        box_y = int(clamp(box_y, 0, canvas_size[1] - box_height))
+    else:
+        box_x = int(clamp(box_x, canvas_size[0] * 0.04, canvas_size[0] - box_width - canvas_size[0] * 0.04))
+        box_y = int(clamp(box_y, canvas_size[1] * 0.08, canvas_size[1] - box_height - canvas_size[1] * 0.08))
     return (box_x, box_y, int(box_width), int(box_height)), style, wrapped, font
 
 
@@ -2574,6 +2685,16 @@ def wrap_overlay_text(text: str, font: Any, max_width: int, target_lines: int) -
         return wrap_overlay_text(text, font, max_width, target_lines + 1)
 
     return "\n".join(lines)
+
+
+def longest_word_width(text: str, font: Any) -> int:
+    measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    words = text.split() or [text]
+    widths = []
+    for word in words:
+        bbox = measure.textbbox((0, 0), word, font=font)
+        widths.append(bbox[2] - bbox[0])
+    return max(widths, default=0)
 
 
 def as_float_optional(value: Any) -> float | None:

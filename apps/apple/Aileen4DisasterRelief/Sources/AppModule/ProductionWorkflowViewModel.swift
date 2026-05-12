@@ -77,8 +77,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
     private static let thinkingExtraContextJSON = ProductionToolSchema.stringify(["enable_thinking": true])
     private static let productionOverlayThinkingEnabled = true
     private static let productionPreAnalysisThinkingEnabled = true
-    private static let productionPostReviewMode: OverlayPostReviewMode = .resultOnly
-    private static let productionGuideProvider: OverlayLayoutGuideProvider = .gemmaVision
+    private static let productionPostReviewMode: OverlayPostReviewMode = .resultOnlyForcedMove
+    private static let productionGuideProvider: OverlayLayoutGuideProvider = .none
     private static let productionGuidanceMode: OverlayLayoutGuidanceMode = .band
     private static let packageDateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -1172,16 +1172,19 @@ enum ProductionPrompts {
         Placement checklist:
         1. Find faces, heads, hair, shoulders, torsos, animals, hands, tools, and story evidence such as plant guards, enclosures, water bowls, crates, shelters, signs, damaged structures, supply setups, sunset bands, horizons, skylines, smoke, floodwater, storm clouds, fire glow, or damage.
         2. Find empty space: sky, wall, water, open ground, side margin, or corner.
-        3. Do not put the text box or sticker background directly across faces, heads, hair, shoulders, torsos, animals, hands, tools, story evidence, or action.
-        4. Edge faces, profile faces, hair, and head silhouettes count as blocked subject area.
-        5. Upper text is OK only if it does not touch any face, story evidence, or main action.
-        6. If using sky/background, keep the entire sticker box there; do not let its lower edge cover guards, stakes, enclosures, hands, animals, or other story objects.
-        7. Bottom text is OK only if the bottom area is open.
-        8. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
-        9. If a face/profile is in the top rows, do not choose an upper-center band.
-        10. If top or bottom would cover the subject or story evidence, use side or corner open space.
-        11. Keep overlay_text short, usually 3 to 6 words. For sticker text longer than five words, use two or three lines.
-        12. If a corner or side sticker would need four text lines, shorten overlay_text to 3 to 5 words instead of accepting a tall block.
+        3. A corner is open only when that corner is visibly empty. If a person, hair, shoulder, plant guard, or story object fills that side, the corner is blocked.
+        4. Do not put the text box or sticker background directly across faces, heads, hair, shoulders, torsos, animals, hands, tools, story evidence, or action.
+        5. In planting, rescue, or care scenes, do not move the text toward hands, tools, plants, guards, animals, paperwork, or the main action. Move away from them into plain open space.
+        6. If a person or animal occupies one side of the image, prefer the opposite open side. Do not place the sticker above or beside that same side's hair, head, shoulder, or body.
+        7. Edge faces, profile faces, hair, and head silhouettes count as blocked subject area.
+        8. Upper text is OK only if it does not touch any face, story evidence, or main action.
+        9. If using sky/background, keep the entire sticker box there; do not let its lower edge cover guards, stakes, enclosures, hands, animals, bright sunset bands, skylines, or other story objects.
+        10. Bottom text is OK only if the bottom area is open.
+        11. If clear side or corner space exists, prefer a smaller side or corner sticker over a big centered band.
+        12. If a face/profile or hair reaches the top rows, do not choose an upper-center or overhead sticker; choose the opposite open side instead.
+        13. If top or bottom would cover the subject or story evidence, use side or corner open space.
+        14. Keep overlay_text short, usually 3 to 6 words. For sticker text longer than five words, use two or three lines.
+        15. If a corner or side sticker would need four text lines, shorten overlay_text to 3 to 5 words instead of accepting a tall block.
 
         Tool-call rules:
         - When tool use is available, do not return the overlay copy as plain text.

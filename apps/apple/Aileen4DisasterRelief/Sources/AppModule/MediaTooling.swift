@@ -334,7 +334,6 @@ final class AppleMediaTooling: @unchecked Sendable {
 
     func makeOverlayReviewAssets(
         renderedAssetID: String,
-        renderedURL: URL,
         reviewContext: OverlayReviewContext?
     ) throws -> [ProductionAssetDescriptor] {
         guard let reviewContext,
@@ -342,15 +341,17 @@ final class AppleMediaTooling: @unchecked Sendable {
               let y = reviewContext.y,
               let width = reviewContext.width,
               let height = reviewContext.height else {
-            return []
+            throw MediaToolingError.invalidArguments("Overlay review requires current overlay box coordinates.")
         }
 
         let currentAsset = try resolveAsset(renderedAssetID)
         let sourceAssetID = reviewContext.sourceAssetID ?? currentAsset.baseAssetID
-        guard let sourceAssetID,
-              let sourceAsset = try? resolveAsset(sourceAssetID),
-              sourceAsset.kind == .image else {
-            return []
+        guard let sourceAssetID else {
+            throw MediaToolingError.invalidArguments("Overlay review requires a source image asset.")
+        }
+        let sourceAsset = try resolveAsset(sourceAssetID)
+        guard sourceAsset.kind == .image else {
+            throw MediaToolingError.invalidArguments("Overlay review requires a source image asset.")
         }
 
         let rect = CGRect(
@@ -359,25 +360,16 @@ final class AppleMediaTooling: @unchecked Sendable {
             width: CGFloat(max(width, 1)),
             height: CGFloat(max(height, 1))
         )
-        let outlineURL = try renderOverlayReviewOutline(on: sourceAsset.url, overlayRect: rect)
-        let gridURL = try renderOverlayReviewGrid(on: renderedURL)
+        let gridURL = try renderOverlayReviewGrid(on: sourceAsset.url)
+        let guideURL = try renderOverlayReviewOutline(on: gridURL, overlayRect: rect)
         return [
             ProductionAssetDescriptor(
-                toolID: "review_outline",
+                toolID: "review_guide",
                 mediaAsset: MediaAsset(
                     kind: .image,
-                    originalURL: outlineURL,
-                    localCopyURL: outlineURL,
-                    displayName: outlineURL.lastPathComponent
-                )
-            ),
-            ProductionAssetDescriptor(
-                toolID: "review_grid",
-                mediaAsset: MediaAsset(
-                    kind: .image,
-                    originalURL: gridURL,
-                    localCopyURL: gridURL,
-                    displayName: gridURL.lastPathComponent
+                    originalURL: guideURL,
+                    localCopyURL: guideURL,
+                    displayName: guideURL.lastPathComponent
                 )
             )
         ]
@@ -424,6 +416,35 @@ final class AppleMediaTooling: @unchecked Sendable {
         if asset.latestOverlayRequest != nil {
             return try await moveTextOverlay(arguments: arguments)
         }
+        if let partialRectError = Self.partialExplicitRectError(arguments),
+           !Self.toleratesPartialRectForInitialOverlay(arguments) {
+            return MediaToolResult(
+                name: "add_text_overlay",
+                payload: [
+                    "status": "invalid_partial_rect",
+                    "asset_id": asset.toolID,
+                    "accepted": false,
+                    "error": partialRectError,
+                    "required_coordinates": ["x", "y", "width", "height"]
+                ],
+                outputURL: nil
+            )
+        }
+        if let rectBoundsError = Self.explicitRectBoundsError(arguments, canvasSize: asset.canvasSize) {
+            return MediaToolResult(
+                name: "add_text_overlay",
+                payload: [
+                    "status": "invalid_rect_bounds",
+                    "asset_id": asset.toolID,
+                    "accepted": false,
+                    "error": rectBoundsError,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                    "canvas_width": Int(asset.canvasSize.width),
+                    "canvas_height": Int(asset.canvasSize.height)
+                ],
+                outputURL: nil
+            )
+        }
         let requestedOverlay = try overlayRequest(
             from: arguments,
             defaultingTo: nil,
@@ -434,7 +455,8 @@ final class AppleMediaTooling: @unchecked Sendable {
             using: layoutGuideOverride,
             canvasSize: asset.canvasSize
         )
-        let protectedRegions = try protectedRegions(for: asset)
+        let usesExactSlot = requestedOverlay.rect.width > 0 && requestedOverlay.rect.height > 0
+        let protectedRegions = usesExactSlot ? .empty : try protectedRegions(for: asset)
         let resolvedOverlay = OverlayRendering.resolve(
             overlay,
             canvasSize: asset.canvasSize,
@@ -492,7 +514,19 @@ final class AppleMediaTooling: @unchecked Sendable {
 
         let currentAsset = try resolveAsset(assetID)
         guard let previousOverlay = currentAsset.latestOverlayRequest else {
-            throw MediaToolingError.invalidArguments("move_text_overlay requires an asset with an existing overlay.")
+            if arguments["overlay_text"] != nil {
+                return try await addTextOverlay(arguments: arguments)
+            }
+            return MediaToolResult(
+                name: "move_text_overlay",
+                payload: [
+                    "status": "invalid_missing_overlay",
+                    "asset_id": currentAsset.toolID,
+                    "accepted": false,
+                    "error": "move_text_overlay requires an asset with an existing overlay. Use add_text_overlay first or include overlay_text."
+                ],
+                outputURL: nil
+            )
         }
         if let partialRectError = Self.partialExplicitRectError(arguments) {
             assetsWithRejectedPartialRect.insert(currentAsset.toolID)
@@ -504,6 +538,21 @@ final class AppleMediaTooling: @unchecked Sendable {
                     "accepted": false,
                     "error": partialRectError,
                     "required_coordinates": ["x", "y", "width", "height"]
+                ],
+                outputURL: currentAsset.url
+            )
+        }
+        if let rectBoundsError = Self.explicitRectBoundsError(arguments, canvasSize: currentAsset.canvasSize) {
+            return MediaToolResult(
+                name: "move_text_overlay",
+                payload: [
+                    "status": "invalid_rect_bounds",
+                    "asset_id": currentAsset.toolID,
+                    "accepted": false,
+                    "error": rectBoundsError,
+                    "required_coordinates": ["x", "y", "width", "height"],
+                    "canvas_width": Int(currentAsset.canvasSize.width),
+                    "canvas_height": Int(currentAsset.canvasSize.height)
                 ],
                 outputURL: currentAsset.url
             )
@@ -538,7 +587,8 @@ final class AppleMediaTooling: @unchecked Sendable {
             using: layoutGuideOverride,
             canvasSize: baseAsset.canvasSize
         )
-        let protectedRegions = try protectedRegions(for: baseAsset)
+        let usesExactSlot = requestedOverlay.rect.width > 0 && requestedOverlay.rect.height > 0
+        let protectedRegions = usesExactSlot ? .empty : try protectedRegions(for: baseAsset)
         let resolvedOverlay = OverlayRendering.resolve(
             overlay,
             canvasSize: baseAsset.canvasSize,
@@ -704,9 +754,7 @@ final class AppleMediaTooling: @unchecked Sendable {
         let rows = 6
         let columnWidth = canvasSize.width / CGFloat(columns)
         let rowHeight = canvasSize.height / CGFloat(rows)
-        let labelFont = UIFont.boldSystemFont(ofSize: max(22, canvasSize.width * 0.026))
         let axisFont = UIFont.boldSystemFont(ofSize: max(16, canvasSize.width * 0.018))
-        let anchorFont = UIFont.boldSystemFont(ofSize: max(14, canvasSize.width * 0.015))
         let labelColor = UIColor(red: 0.06, green: 0.08, blue: 0.1, alpha: 0.94)
 
         context.saveGState()
@@ -727,23 +775,6 @@ final class AppleMediaTooling: @unchecked Sendable {
             drawReviewLabel("y\(Int(round(y)))", at: CGPoint(x: 4, y: min(max(y + 5, 4), canvasSize.height - 32)), font: axisFont, color: labelColor)
         }
 
-        for row in 0..<rows {
-            for column in 0..<columns {
-                let left = CGFloat(column) * columnWidth
-                let top = CGFloat(row) * rowHeight
-                let center = CGPoint(x: left + columnWidth / 2, y: top + rowHeight / 2)
-                let cellLabel = "\(Character(UnicodeScalar(65 + column)!))\(row + 1)"
-                drawReviewLabel(cellLabel, at: CGPoint(x: left + 8, y: top + 8), font: labelFont, color: labelColor)
-                context.setFillColor(UIColor(red: 0.0, green: 0.58, blue: 1.0, alpha: 0.86).cgColor)
-                context.fillEllipse(in: CGRect(x: center.x - 6, y: center.y - 6, width: 12, height: 12))
-                drawReviewLabel(
-                    "\(Int(round(center.x))),\(Int(round(center.y)))",
-                    at: CGPoint(x: center.x - 42, y: center.y + 8),
-                    font: anchorFont,
-                    color: UIColor(red: 0.0, green: 0.28, blue: 0.58, alpha: 0.96)
-                )
-            }
-        }
         context.restoreGState()
     }
 
@@ -907,13 +938,19 @@ final class AppleMediaTooling: @unchecked Sendable {
         }
 
         let style = arguments["style"]?.stringValue.flatMap { OverlayStyle(rawValue: $0) } ?? previous?.style ?? .auto
-        let horizontalAnchor = arguments["horizontal_anchor"]?.stringValue.flatMap { OverlayHorizontalAnchor(rawValue: $0) } ?? previous?.horizontalAnchor ?? .center
-        let verticalAnchor = arguments["vertical_anchor"]?.stringValue.flatMap { OverlayVerticalAnchor(rawValue: $0) } ?? previous?.verticalAnchor ?? .top
         let explicitRectFields = ["x", "y", "width", "height"]
-        let hasNormalizedOverride = arguments["top_fraction"] != nil || arguments["max_width_fraction"] != nil || arguments["target_line_count"] != nil
+        let hasNormalizedOverride = arguments["top_fraction"] != nil ||
+            arguments["max_width_fraction"] != nil ||
+            arguments["target_line_count"] != nil ||
+            arguments["horizontal_anchor"] != nil ||
+            arguments["vertical_anchor"] != nil
         let providedExplicitRectFields = Set(explicitRectFields.filter { arguments[$0] != nil })
         let hasCompleteExplicitRectOverride = providedExplicitRectFields.count == explicitRectFields.count
         let shouldUseExplicitRect = hasCompleteExplicitRectOverride
+        let horizontalAnchor = arguments["horizontal_anchor"]?.stringValue.flatMap { OverlayHorizontalAnchor(rawValue: $0) }
+            ?? (shouldUseExplicitRect ? .left : previous?.horizontalAnchor ?? .center)
+        let verticalAnchor = arguments["vertical_anchor"]?.stringValue.flatMap { OverlayVerticalAnchor(rawValue: $0) }
+            ?? (shouldUseExplicitRect ? .top : previous?.verticalAnchor ?? .top)
 
         let rect: CGRect
         if shouldUseExplicitRect {
@@ -957,6 +994,49 @@ final class AppleMediaTooling: @unchecked Sendable {
         }
         let missingFields = explicitRectFields.filter { arguments[$0] == nil }
         return "Partial rectangle provided. Missing: \(missingFields.joined(separator: ", "))."
+    }
+
+    private static func toleratesPartialRectForInitialOverlay(_ arguments: [String: LiteRTToolValue]) -> Bool {
+        let explicitRectFields = ["x", "y", "width", "height"]
+        let providedFieldCount = explicitRectFields.filter { arguments[$0] != nil }.count
+        guard providedFieldCount > 0 && providedFieldCount < explicitRectFields.count else {
+            return false
+        }
+        return arguments["top_fraction"] != nil ||
+            arguments["max_width_fraction"] != nil ||
+            arguments["target_line_count"] != nil ||
+            arguments["horizontal_anchor"] != nil ||
+            arguments["vertical_anchor"] != nil
+    }
+
+    private static func explicitRectBoundsError(
+        _ arguments: [String: LiteRTToolValue],
+        canvasSize: CGSize
+    ) -> String? {
+        let explicitRectFields = ["x", "y", "width", "height"]
+        guard explicitRectFields.allSatisfy({ arguments[$0] != nil }) else {
+            return nil
+        }
+        let x = arguments["x"]?.numberValue ?? 0
+        let y = arguments["y"]?.numberValue ?? 0
+        let width = arguments["width"]?.numberValue ?? 0
+        let height = arguments["height"]?.numberValue ?? 0
+        guard width > 0, height > 0 else {
+            return "Exact rectangle width and height must be positive."
+        }
+        if width < 240 || height < 60 {
+            return "Exact rectangle is too small for readable sticker text. Use width at least 240 and height at least 60."
+        }
+        let edgeMargin: CGFloat = 40
+        if x < edgeMargin || y < edgeMargin ||
+            x + width > canvasSize.width - edgeMargin ||
+            y + height > canvasSize.height - edgeMargin {
+            return "Exact rectangle must leave at least 40 px of margin from every canvas edge."
+        }
+        if x < 0 || y < 0 || x + width > canvasSize.width || y + height > canvasSize.height {
+            return "Exact rectangle must fit fully inside the \(Int(canvasSize.width))x\(Int(canvasSize.height)) canvas."
+        }
+        return nil
     }
 
     private static func upperRowRetryError(

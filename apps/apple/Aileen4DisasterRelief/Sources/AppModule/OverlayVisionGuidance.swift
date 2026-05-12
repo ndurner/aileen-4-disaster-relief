@@ -160,13 +160,21 @@ enum OverlayLayoutGuidance {
             "Pre-analysis of the rendered \(Int(canvasSize.width))x\(Int(canvasSize.height)) canvas:"
         ]
 
-        if let subjectRect = guide.subjectRect {
+        let usableSubjectRect = guide.subjectRect.flatMap {
+            isUsableSubjectRect($0, canvasSize: canvasSize) ? $0 : nil
+        }
+        let guideSubjectWasOverbroad = guide.subjectRect != nil && usableSubjectRect == nil
+        let usableSlotRect = guideSubjectWasOverbroad ? nil : guide.slotRect.flatMap {
+            isUsableSlotRect($0, subjectRect: usableSubjectRect, canvasSize: canvasSize) ? $0 : nil
+        }
+
+        if let subjectRect = usableSubjectRect {
             lines.append(
-                "- Keep-clear subject box: x=\(Int(subjectRect.minX.rounded())), y=\(Int(subjectRect.minY.rounded())), width=\(Int(subjectRect.width.rounded())), height=\(Int(subjectRect.height.rounded())). Keep the overlay fully outside it."
+                "- Protected keep-clear box: x=\(Int(subjectRect.minX.rounded())), y=\(Int(subjectRect.minY.rounded())), width=\(Int(subjectRect.width.rounded())), height=\(Int(subjectRect.height.rounded())). Keep the overlay fully outside it."
             )
         }
 
-        if let slotRect = guide.slotRect {
+        if let slotRect = usableSlotRect {
             switch mode {
             case .slot:
                 lines.append(
@@ -176,7 +184,7 @@ enum OverlayLayoutGuidance {
                 lines.append(
                     "- Preferred free-space patch: x=\(Int(slotRect.minX.rounded())), y=\(Int(slotRect.minY.rounded())), width=\(Int(slotRect.width.rounded())), height=\(Int(slotRect.height.rounded())). Use it as coarse guidance, not as the final text box."
                 )
-                if let orientation = orientationLabel(slotRect: slotRect, subjectRect: guide.subjectRect) {
+                if let orientation = orientationLabel(slotRect: slotRect, subjectRect: usableSubjectRect) {
                     lines.append("- The free-space patch sits mostly \(orientation) the subject.")
                 }
             }
@@ -271,7 +279,8 @@ enum OverlayLayoutGuidance {
         from guide: OverlayLayoutGuide,
         canvasSize: CGSize
     ) -> OverlayProtectedRegions {
-        guard let subjectRect = guide.subjectRect else {
+        guard let subjectRect = guide.subjectRect,
+              isUsableSubjectRect(subjectRect, canvasSize: canvasSize) else {
             return .empty
         }
 
@@ -301,6 +310,45 @@ enum OverlayLayoutGuidance {
             }
     }
 
+    static func isUsableSubjectRect(_ rect: CGRect, canvasSize: CGSize) -> Bool {
+        guard rect.width > 0,
+              rect.height > 0,
+              canvasSize.width > 0,
+              canvasSize.height > 0 else {
+            return false
+        }
+        let canvasArea = canvasSize.width * canvasSize.height
+        let areaFraction = (rect.width * rect.height) / max(canvasArea, 1)
+        let widthFraction = rect.width / max(canvasSize.width, 1)
+        let heightFraction = rect.height / max(canvasSize.height, 1)
+        return areaFraction < 0.72 && !(widthFraction > 0.92 && heightFraction > 0.72)
+    }
+
+    static func isUsableSlotRect(_ rect: CGRect, subjectRect: CGRect?, canvasSize: CGSize) -> Bool {
+        guard rect.width > 0,
+              rect.height > 0,
+              canvasSize.width > 0,
+              canvasSize.height > 0 else {
+            return false
+        }
+        let canvas = CGRect(origin: .zero, size: canvasSize)
+        let clipped = rect.intersection(canvas)
+        guard !clipped.isNull, clipped.width > 0, clipped.height > 0 else {
+            return false
+        }
+        let areaFraction = (clipped.width * clipped.height) / max(canvas.width * canvas.height, 1)
+        guard areaFraction >= 0.025, areaFraction <= 0.35 else {
+            return false
+        }
+        if let subjectRect,
+           isUsableSubjectRect(subjectRect, canvasSize: canvasSize),
+           let overlap = overlapFraction(overlayRect: clipped, subjectRect: subjectRect),
+           overlap > 0.08 {
+            return false
+        }
+        return true
+    }
+
     private static func bestSlot(canvasSize: CGSize, blockedRect: CGRect?) -> CGRect? {
         let canvas = CGRect(origin: .zero, size: canvasSize)
         guard canvas.width > 0, canvas.height > 0 else { return nil }
@@ -328,7 +376,13 @@ enum OverlayLayoutGuidance {
         let protectedRegions = protectedRegions(from: guide, canvasSize: canvasSize)
         let blockedRect = union(of: protectedRegions.avoidanceRects) ?? union(of: protectedRegions.subjectRects)
         var candidates = candidateSlots(canvas: canvas, blockedRect: blockedRect)
-        if let coarseSlot = guide.slotRect, !coarseSlot.isNull, !coarseSlot.isEmpty {
+        let usableSubjectRect = guide.subjectRect.flatMap {
+            isUsableSubjectRect($0, canvasSize: canvasSize) ? $0 : nil
+        }
+        let guideSubjectWasOverbroad = guide.subjectRect != nil && usableSubjectRect == nil
+        if let coarseSlot = guide.slotRect,
+           !guideSubjectWasOverbroad,
+           isUsableSlotRect(coarseSlot, subjectRect: usableSubjectRect, canvasSize: canvasSize) {
             candidates.insert(coarseSlot.integral, at: 0)
         }
         candidates = deduplicatedRects(candidates)
@@ -666,7 +720,7 @@ enum OverlayLayoutGuidance {
 }
 
 enum OverlayGuideToolSchema {
-    static let toolName = "submit_overlay_layout_guide"
+    static let toolName = "determine_overlay_layout_guide"
 
     static let toolsJSON = """
     [
@@ -674,15 +728,15 @@ enum OverlayGuideToolSchema {
         "type": "function",
         "function": {
           "name": "\(toolName)",
-          "description": "Analyze a rendered social-media frame, identify the main subject keep-clear box, and optionally suggest a coarse free-space patch for a short Instagram overlay.",
+          "description": "Determine the protected keep-clear area and, only if safe, one open patch for a short Instagram overlay.",
           "parameters": {
             "type": "object",
             "properties": {
-              "subject_x": { "type": "number" },
-              "subject_y": { "type": "number" },
-              "subject_width": { "type": "number" },
-              "subject_height": { "type": "number" },
-              "subject_confidence": { "type": "number" },
+              "protected_x": { "type": "number" },
+              "protected_y": { "type": "number" },
+              "protected_width": { "type": "number" },
+              "protected_height": { "type": "number" },
+              "protected_confidence": { "type": "number" },
               "slot_x": { "type": "number" },
               "slot_y": { "type": "number" },
               "slot_width": { "type": "number" },
@@ -706,11 +760,11 @@ enum OverlayGuideToolSchema {
               "notes": { "type": "string" }
             },
             "required": [
-              "subject_x",
-              "subject_y",
-              "subject_width",
-              "subject_height",
-              "subject_confidence",
+              "protected_x",
+              "protected_y",
+              "protected_width",
+              "protected_height",
+              "protected_confidence",
               "recommended_style",
               "notes"
             ]
@@ -738,10 +792,10 @@ enum OverlayGuideToolSchema {
         fallbackText: String
     ) -> OverlayLayoutGuide {
         let subjectRect = rect(
-            x: arguments["subject_x"]?.numberValue,
-            y: arguments["subject_y"]?.numberValue,
-            width: arguments["subject_width"]?.numberValue,
-            height: arguments["subject_height"]?.numberValue
+            x: arguments["protected_x"]?.numberValue ?? arguments["subject_x"]?.numberValue,
+            y: arguments["protected_y"]?.numberValue ?? arguments["subject_y"]?.numberValue,
+            width: arguments["protected_width"]?.numberValue ?? arguments["subject_width"]?.numberValue,
+            height: arguments["protected_height"]?.numberValue ?? arguments["subject_height"]?.numberValue
         )
         let slotRect = rect(
             x: arguments["slot_x"]?.numberValue,
@@ -753,7 +807,7 @@ enum OverlayGuideToolSchema {
         return OverlayLayoutGuide(
             provider: .gemmaVision,
             subjectRect: subjectRect,
-            subjectConfidence: arguments["subject_confidence"]?.numberValue,
+            subjectConfidence: arguments["protected_confidence"]?.numberValue ?? arguments["subject_confidence"]?.numberValue,
             slotRect: slotRect,
             slotConfidence: arguments["slot_confidence"]?.numberValue,
             recommendedStyle: arguments["recommended_style"]?.stringValue.flatMap(OverlayStyle.init(rawValue:)),
@@ -809,13 +863,17 @@ enum GemmaOverlayVision {
         )
         let canvasSize = OverlayLayoutGuidance.canvasSize(for: renderedURL) ?? AppleMediaTooling.imageCanvasSize
         let prompt = """
-        Analyze this rendered social-media frame for overlay placement.
+        Determine overlay placement guidance for this rendered social-media frame.
         The canvas is \(Int(canvasSize.width))x\(Int(canvasSize.height)) pixels. Return all coordinates as pixel values in this rendered canvas.
-        Identify the main subject or subject cluster that should stay unobscured by overlay text or a sticker.
-        Return one conservative subject keep-clear box that covers the full visible subject silhouette plus breathing room. If you are unsure, make the keep-clear box larger, not smaller.
+        Determine all protected visual areas first: people, faces, heads, hair, hands, animals, tools, enclosures, plant guards, paperwork, skyline, sunset band, smoke, fire, flood water, storm clouds, damage, and main action.
+        Return one conservative protected keep-clear box that covers every protected area the sticker must avoid, with breathing room.
+        If protected areas are separated, cover the full union or make the box larger. Do not protect only the animal and forget the person, face, head, hands, tools, or story objects.
+        Keep the protected box tight enough to leave real open space when possible. Do not mark the whole canvas protected unless there is truly no safe sticker area.
+        If you are unsure, make the keep-clear box larger, not smaller.
         Prefer sticker for busy subject-dominant frames, caption for real negative space, headline only when a single line can stay legible without a box, and tag only for an actual handle or label.
-        You may optionally return one coarse free-space patch if it is obvious, but subject protection matters more than patch precision.
-        If there is no truly clean patch, omit the slot fields or return a very low slot_confidence and explain the compromise in notes.
+        You may optionally return one coarse free-space patch only if it is clearly outside all protected areas and has breathing room.
+        Do not return an upper patch when a face, head, hair, skyline, sunset band, or story evidence sits in that upper area.
+        If there is no truly clean patch, omit the slot fields or return very low slot_confidence and explain the compromise in notes.
         """
 
         let activeRunner = runner ?? GemmaTextRunner()
@@ -845,18 +903,19 @@ enum GemmaOverlayVision {
                     ),
                     canvasSize: canvasSize
                 )
+                let replaceSlot = Self.shouldReplaceSlot(in: guide)
                 guide = OverlayLayoutGuide(
                     provider: .gemmaVision,
                     subjectRect: guide.subjectRect ?? fallbackGuide.subjectRect,
                     subjectConfidence: guide.subjectConfidence ?? fallbackGuide.subjectConfidence,
-                    slotRect: guide.slotRect ?? fallbackGuide.slotRect,
-                    slotConfidence: guide.slotConfidence ?? fallbackGuide.slotConfidence,
+                    slotRect: replaceSlot ? fallbackGuide.slotRect : (guide.slotRect ?? fallbackGuide.slotRect),
+                    slotConfidence: replaceSlot ? fallbackGuide.slotConfidence : (guide.slotConfidence ?? fallbackGuide.slotConfidence),
                     recommendedStyle: guide.recommendedStyle ?? fallbackGuide.recommendedStyle,
-                    recommendedTopFraction: guide.recommendedTopFraction ?? fallbackGuide.recommendedTopFraction,
-                    recommendedMaxWidthFraction: guide.recommendedMaxWidthFraction ?? fallbackGuide.recommendedMaxWidthFraction,
+                    recommendedTopFraction: replaceSlot ? fallbackGuide.recommendedTopFraction : (guide.recommendedTopFraction ?? fallbackGuide.recommendedTopFraction),
+                    recommendedMaxWidthFraction: replaceSlot ? fallbackGuide.recommendedMaxWidthFraction : (guide.recommendedMaxWidthFraction ?? fallbackGuide.recommendedMaxWidthFraction),
                     recommendedTargetLineCount: guide.recommendedTargetLineCount ?? fallbackGuide.recommendedTargetLineCount,
-                    horizontalAnchor: guide.horizontalAnchor ?? fallbackGuide.horizontalAnchor,
-                    verticalAnchor: guide.verticalAnchor ?? fallbackGuide.verticalAnchor,
+                    horizontalAnchor: replaceSlot ? fallbackGuide.horizontalAnchor : (guide.horizontalAnchor ?? fallbackGuide.horizontalAnchor),
+                    verticalAnchor: replaceSlot ? fallbackGuide.verticalAnchor : (guide.verticalAnchor ?? fallbackGuide.verticalAnchor),
                     notes: guide.notes.isEmpty ? fallbackGuide.notes : guide.notes
                 )
             }
@@ -881,7 +940,18 @@ enum GemmaOverlayVision {
         if guide.slotRect == nil || guide.recommendedStyle == nil {
             return true
         }
+        if shouldReplaceSlot(in: guide) {
+            return true
+        }
+        return false
+    }
+
+    private static func shouldReplaceSlot(in guide: OverlayLayoutGuide) -> Bool {
         guard let slotRect = guide.slotRect else {
+            return true
+        }
+        let canvasSize = AppleMediaTooling.imageCanvasSize
+        if !OverlayLayoutGuidance.isUsableSlotRect(slotRect, subjectRect: guide.subjectRect, canvasSize: canvasSize) {
             return true
         }
         if let subjectRect = guide.subjectRect,
