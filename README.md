@@ -26,8 +26,8 @@ Current repository state:
 - the Apple app supports on-device inference through a LiteRT-LM bridge built
   around the high-level Conversation JSON interface
 - the Apple app also supports hosted Gemma 4 models through the Gemini API
-- model injection and in-app `.litertlm` import are supported for local device
-  testing
+- Settings can download, import, or discover injected `.litertlm` files for
+  local on-device runs
 - the content-production workflow is implemented as the main product flow
 - image and video overlay rendering uses Apple frameworks such as AVFoundation,
   CoreImage, CoreGraphics, ImageIO, and UIKit rather than a bundled FFmpeg
@@ -39,7 +39,6 @@ Current repository state:
 
 Still intentionally incomplete:
 
-- in-app first-party model download
 - datacenter service implementation
 - production hardening and deployment setup
 - overlay prompt and tool-contract quality work, especially around placement
@@ -106,7 +105,7 @@ Current product areas in the app:
   handoff packaging, retry, export, and sharing.
 - `Settings`
   Collaborator mode, processing location, on-device model selection, hosted model
-  selection, local model import, and Gemini API key storage.
+  selection, model download/import status, and Gemini API key storage.
 
 ## Model Strategy
 
@@ -125,7 +124,9 @@ On-device mode:
 - local Gemma 4 E2B and E4B `.litertlm` files
 - LiteRT-LM Conversation JSON bridge
 - model discovery from `Application Support/Models`
-- model import from Files into the app's on-device model folder
+- model download from the pinned Hugging Face LiteRT community model revisions
+  into the app's on-device model folder
+- model import from Files into the same app-managed model folder
 - device injection through `apps/apple/scripts/shared/inject_models_to_device.sh`
 
 Cloud mode:
@@ -144,7 +145,7 @@ Cloud mode:
   stage, and include attempt counts and timeout reasons in Production errors
 - this is not Vertex AI and does not use OpenRouter-specific routing controls
 
-Pinned LiteRT-LM download URLs for local testing:
+Pinned LiteRT-LM download URLs used by Settings and local testing:
 
 - E2B: `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm`
 - E4B: `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/afca9a55ba2848faee6588e46b47c3164411a903/gemma-4-E4B-it.litertlm`
@@ -356,6 +357,11 @@ cp ~/dev/gemma4-tests/.model-cache-stash/gemma-4-E2B-it.litertlm \
 ```
 
 Restart the app if it was already running so it re-reads the container contents.
+
+The Settings screen can also download the pinned E2B and E4B LiteRT-LM files
+directly into the app-managed on-device model folder. Manual injection remains
+useful for offline testing, preloaded devices, and avoiding repeated multi-GB
+downloads during development.
 
 Run the overlay lab:
 

@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @StateObject private var modelDownloadStore = ModelDownloadStore()
     @State private var importPickerPresented = false
     @State private var importError: String?
     @State private var revealsCloudAPIKey = false
@@ -143,34 +144,92 @@ struct SettingsView: View {
 
     private var onDeviceModelsCard: some View {
         OceanCard {
-            OceanSectionHeader(title: "On-device models", detail: "Imported and injected are the same here")
+            OceanSectionHeader(title: "On-device models", detail: "Downloaded, imported, and injected are the same here")
 
             VStack(spacing: 12) {
                 ForEach(ModelOption.allCases) { model in
-                    let availability = modelLocator.resolve(model)
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: availability.url == nil ? "circle.dashed" : "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(availability.url == nil ? OceanPalette.coral : OceanPalette.reef)
-                            .padding(.top, 2)
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(model.displayName)
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundStyle(OceanPalette.ink)
-
-                            Text(availability.detail)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(OceanPalette.ink.opacity(0.64))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(Color.white.opacity(0.52))
-                    )
+                    onDeviceModelRow(model)
                 }
+            }
+        }
+    }
+
+    private func onDeviceModelRow(_ model: ModelOption) -> some View {
+        let availability = modelLocator.resolve(model)
+        let downloadState = modelDownloadStore.state(for: model)
+        let isAvailable = availability.url != nil
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: isAvailable ? "checkmark.circle.fill" : "circle.dashed")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(isAvailable ? OceanPalette.reef : OceanPalette.coral)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink)
+
+                    Text(availability.detail)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(OceanPalette.ink.opacity(0.64))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Text("Download source: \(model.downloadSourceName)")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(OceanPalette.ink.opacity(0.58))
+                .fixedSize(horizontal: false, vertical: true)
+
+            modelDownloadControls(for: model, state: downloadState, isAvailable: isAvailable)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.white.opacity(0.52))
+        )
+    }
+
+    @ViewBuilder
+    private func modelDownloadControls(for model: ModelOption, state: ModelDownloadState, isAvailable: Bool) -> some View {
+        if state.isDownloading {
+            VStack(alignment: .leading, spacing: 10) {
+                ProgressView(value: state.progressFraction)
+                    .tint(OceanPalette.deepWater)
+
+                HStack(spacing: 12) {
+                    Text(state.statusText)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.deepWater)
+
+                    Spacer(minLength: 8)
+
+                    Button("Cancel") {
+                        modelDownloadStore.cancelDownload(for: model)
+                    }
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(OceanPalette.coral)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                if case .failed = state {
+                    Text(state.statusText)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.coral)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if case .completed = state {
+                    Text(state.statusText)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(OceanPalette.deepWater)
+                }
+
+                Button(isAvailable ? "Download fresh copy" : "Download model") {
+                    modelDownloadStore.startDownload(for: model)
+                }
+                .buttonStyle(OceanPrimaryButtonStyle())
             }
         }
     }

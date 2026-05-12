@@ -1,6 +1,6 @@
 import Foundation
 
-enum ProductionExecutionMode: String, CaseIterable, Identifiable {
+enum ProductionExecutionMode: String, CaseIterable, Identifiable, Sendable {
     case field = "field"
     case desk = "desk"
 
@@ -34,7 +34,7 @@ enum ProductionExecutionMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum InferenceMode: String, CaseIterable, Identifiable {
+enum InferenceMode: String, CaseIterable, Identifiable, Sendable {
     case onDevice = "on_device"
     case cloud
 
@@ -50,7 +50,7 @@ enum InferenceMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum ModelOption: String, CaseIterable, Identifiable {
+enum ModelOption: String, CaseIterable, Identifiable, Sendable {
     case e2bLiteRT = "gemma-4-E2B-it.litertlm"
     case e4bLiteRT = "gemma-4-E4B-it.litertlm"
 
@@ -73,9 +73,27 @@ enum ModelOption: String, CaseIterable, Identifiable {
             return "Post body generation"
         }
     }
+
+    var downloadURL: URL {
+        switch self {
+        case .e2bLiteRT:
+            return URL(string: "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm")!
+        case .e4bLiteRT:
+            return URL(string: "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/afca9a55ba2848faee6588e46b47c3164411a903/gemma-4-E4B-it.litertlm")!
+        }
+    }
+
+    var downloadSourceName: String {
+        switch self {
+        case .e2bLiteRT:
+            return "litert-community/gemma-4-E2B-it-litert-lm"
+        case .e4bLiteRT:
+            return "litert-community/gemma-4-E4B-it-litert-lm"
+        }
+    }
 }
 
-enum CloudModelOption: String, CaseIterable, Identifiable {
+enum CloudModelOption: String, CaseIterable, Identifiable, Sendable {
     case gemma426bA4B = "gemma-4-26b-a4b-it"
     case gemma431B = "gemma-4-31b-it"
 
@@ -117,7 +135,7 @@ struct InferenceConfiguration {
     }
 }
 
-enum ModelAvailability {
+enum ModelAvailability: Sendable {
     case available(URL, detail: String)
     case missing(detail: String)
 
@@ -164,8 +182,8 @@ struct ModelLocator {
                 .appendingPathComponent(model.rawValue, isDirectory: false)
 
             let orderedCandidates: [(URL, String)] = [
-                (injected, "Available on device from Application Support/Models."),
-                (imported, "Available on device from imported Files storage.")
+                (imported, "Available on device from downloaded or imported Files storage."),
+                (injected, "Available on device from Application Support/Models.")
             ]
 
             for (url, detail) in orderedCandidates where FileManager.default.fileExists(atPath: url.path) {
@@ -173,7 +191,7 @@ struct ModelLocator {
             }
 
             return .missing(
-                detail: "Expected \(model.rawValue) in Application Support/Models or the imported on-device model folder. Add it from Files in Settings or push it with the shared device script."
+                detail: "Expected \(model.rawValue) in Application Support/Models or the downloaded on-device model folder. Download it in Settings, add it from Files, or push it with the shared device script."
             )
         } catch {
             return .missing(detail: "Unable to resolve model storage: \(error.localizedDescription)")

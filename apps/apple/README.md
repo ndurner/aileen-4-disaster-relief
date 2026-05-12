@@ -13,7 +13,7 @@ Current focus:
 - Field Mode for creating finished posts locally or in the cloud
 - Desk Mode for packaging raw media so a teammate can finish later
 - selectable on-device LiteRT-LM or hosted Gemini API processing
-- local Gemma 4 LiteRT model management for on-device runs
+- local Gemma 4 LiteRT model download, import, and discovery for on-device runs
 - Gemini API key and hosted Gemma 4 model settings for cloud runs
 - on-device Apple-native media tool-calling orchestration
 - shareable packages containing raw story inputs, media manifests, pre-render
@@ -40,6 +40,9 @@ Apple-specific support files live alongside the app:
   copies
 - `apps/apple/overlay-lab/`: segregated overlay experiments, local render
   checks, and simulator-driven Gemma overlay runs
+- Settings downloads the pinned LiteRT-LM E2B/E4B model files from the
+  `litert-community` Hugging Face repositories into the same app-managed model
+  folder used by Files imports
 - Cloud production calls the Gemini API with field-mode deadlines for unstable
   networks, visible stage labels, explicit timeout errors, and a cancel action
   that unwinds the Production state. Cloud media is uploaded through the Gemini
