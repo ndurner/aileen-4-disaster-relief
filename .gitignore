@@ -38,3 +38,7 @@ apps/apple/ThirdParty/GoogleAIEdge/*
 apps/apple/build
 scratch
 gemma4good-evidence-2026-05-10
+media/
+
+.obsidian
+.env
