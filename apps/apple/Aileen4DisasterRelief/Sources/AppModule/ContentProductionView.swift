@@ -393,12 +393,12 @@ struct ContentProductionView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Safety note")
+                    Text("Review notes")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(OceanPalette.ink)
 
                     OceanTextEditor(
-                        text: $viewModel.fieldUpdateDetails.safetyWarning,
+                        text: $viewModel.fieldUpdateDetails.reviewNotes,
                         placeholder: "Anything that should limit what gets published.",
                         minHeight: 112
                     )

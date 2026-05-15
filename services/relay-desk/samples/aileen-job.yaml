@@ -13,7 +13,7 @@ story:
 field_update:
   location_label: "Ningaloo coast"
   update_time_local: "Apr 4, 2026 afternoon"
-  safety_warning: |-
+  review_notes: |-
     Keep public location broad; avoid exact rescue, private, supply, route,
     and responder staging locations.
 

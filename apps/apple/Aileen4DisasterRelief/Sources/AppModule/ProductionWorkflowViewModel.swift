@@ -33,9 +33,9 @@ final class ProductionWorkflowViewModel: ObservableObject {
         var updateTimeMode: MetadataFieldMode = .fromMedia
         var manualLocationLabel = ""
         var manualUpdateTimeLocal = ""
-        var safetyWarning = Self.defaultSafetyWarning
+        var reviewNotes = Self.defaultReviewNotes
 
-        static let defaultSafetyWarning = "Keep public location broad; avoid exact rescue, private, supply, route, and responder staging locations."
+        static let defaultReviewNotes = "Keep public location broad; avoid exact rescue, private, supply, route, and responder staging locations."
     }
 
     private struct ProductionOverlayPreparation {
@@ -412,8 +412,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
 
         let locationLabel = packageLocationLabel()
         let updateTimeLocal = packageUpdateTimeLocal()
-        let safetyWarning = fieldUpdateDetails.safetyWarning.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !locationLabel.isEmpty || !updateTimeLocal.isEmpty || !safetyWarning.isEmpty {
+        let reviewNotes = fieldUpdateDetails.reviewNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !locationLabel.isEmpty || !updateTimeLocal.isEmpty || !reviewNotes.isEmpty {
             lines.append("")
             lines.append("field_update:")
             if !locationLabel.isEmpty {
@@ -422,9 +422,9 @@ final class ProductionWorkflowViewModel: ObservableObject {
             if !updateTimeLocal.isEmpty {
                 lines.append("  update_time_local: \(yamlScalar(updateTimeLocal))")
             }
-            if !safetyWarning.isEmpty {
-                lines.append("  safety_warning: |-")
-                lines.append(contentsOf: yamlBlockLines(safetyWarning, indentation: "    "))
+            if !reviewNotes.isEmpty {
+                lines.append("  review_notes: |-")
+                lines.append(contentsOf: yamlBlockLines(reviewNotes, indentation: "    "))
             }
         }
 
@@ -471,8 +471,8 @@ final class ProductionWorkflowViewModel: ObservableObject {
     }
 
     private func updateFieldDetailsFromMediaIfNeeded() {
-        if fieldUpdateDetails.safetyWarning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            fieldUpdateDetails.safetyWarning = FieldUpdateDetails.defaultSafetyWarning
+        if fieldUpdateDetails.reviewNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fieldUpdateDetails.reviewNotes = FieldUpdateDetails.defaultReviewNotes
         }
     }
 

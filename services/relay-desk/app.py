@@ -1211,8 +1211,13 @@ def package_summary(package: dict[str, Any], media_files: list[Any] | None) -> s
         f"<div><dt>Attached here</dt><dd>{uploaded_count}</dd></div>",
         "</dl>",
     ]
-    if update.get("safety_warning"):
-        parts.append(f'<div class="aileen-warning">{escape_html(update["safety_warning"])}</div>')
+    if update.get("review_notes"):
+        parts.append(
+            '<div class="aileen-warning">'
+            '<strong>Review notes</strong>'
+            f'<p>{escape_html(update["review_notes"])}</p>'
+            "</div>"
+        )
     parts.append("</div>")
     return "\n".join(parts)
 
@@ -2763,9 +2768,9 @@ def completed_package_yaml(package: dict[str, Any], post_body: str, assets: list
             lines.append(f"  location_label: {yaml_scalar(update['location_label'])}")
         if update.get("update_time_local"):
             lines.append(f"  update_time_local: {yaml_scalar(update['update_time_local'])}")
-        if update.get("safety_warning"):
-            lines.append("  safety_warning: |-")
-            lines.extend(yaml_block_lines(update["safety_warning"], "    "))
+        if update.get("review_notes"):
+            lines.append("  review_notes: |-")
+            lines.extend(yaml_block_lines(update["review_notes"], "    "))
 
     lines.extend(["", "media:"])
     lines.append("  - id: media_001")
