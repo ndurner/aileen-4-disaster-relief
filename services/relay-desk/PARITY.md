@@ -71,12 +71,12 @@ Field Mode parity.
   arguments as an explicit slot even when the model also emits stale normalized
   hints. Partial rectangle follow-ups are rejected so the correction stage does
   not silently preserve a bad prior slot.
-- The Relay correction pass and iOS production correction pass attach temporary
-  review aids: a clean frame with a red outline marking the current sticker box,
-  a coordinate scaffold with coarse A1-F6 cells and pixel anchor dots, and the
-  current rendered label. These aids let the VLM judge coverage and choose its
-  own correction rectangle. The aids are not part of the final rendered output
-  and are not deterministic placement scorers.
+- The Relay correction pass and iOS production correction pass attach a
+  temporary clean review guide: the source frame materialized onto the active
+  canvas, yellow 6x6 grid lines with pixel-coordinate edge labels, and a red
+  rounded rectangle marking the current full sticker box. The guide lets the VLM
+  judge coverage and choose its own correction rectangle. It is not part of the
+  final rendered output and is not a deterministic placement scorer.
 - Relay batch runs enable Gemma thinking by default and persist raw responses
   plus extracted thought traces so prompt failures can be diagnosed from the
   model's own correction-stage reasoning.
