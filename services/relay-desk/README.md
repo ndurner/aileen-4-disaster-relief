@@ -1,6 +1,6 @@
 ---
 title: Aileen Relay Desk
-colorFrom: teal
+colorFrom: green
 colorTo: blue
 sdk: gradio
 sdk_version: 5.50.0
