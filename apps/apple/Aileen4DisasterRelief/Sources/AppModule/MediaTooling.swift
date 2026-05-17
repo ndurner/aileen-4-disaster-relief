@@ -759,6 +759,11 @@ final class AppleMediaTooling: @unchecked Sendable {
 
         context.saveGState()
         context.setLineWidth(3)
+        // Parity note: label drawing currently mutates the graphics state, so later
+        // grid strokes can inherit the dark label color instead of staying yellow.
+        // This is not necessarily worse for model vision; SCAFFOLD-style guides use
+        // high-contrast black/white anchors. Keep behavior stable until all pipelines
+        // and writeup assets are intentionally updated together.
         context.setStrokeColor(UIColor(red: 1.0, green: 0.85, blue: 0.25, alpha: 0.58).cgColor)
         for index in 0...columns {
             let x = CGFloat(index) * columnWidth
