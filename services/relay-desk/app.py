@@ -185,7 +185,7 @@ gradio-app {
 .aileen-hero img {
   position: absolute;
   inset: 0;
-  z-index: -2;
+  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -196,17 +196,19 @@ gradio-app {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 1;
   background:
     linear-gradient(90deg, rgba(8, 29, 36, 0.76) 0%, rgba(8, 29, 36, 0.30) 48%, rgba(8, 29, 36, 0.12) 100%),
     linear-gradient(0deg, rgba(8, 29, 36, 0.90) 0%, rgba(8, 29, 36, 0.04) 60%);
 }
 
 .aileen-hero__copy {
+  position: relative;
+  z-index: 2;
   max-width: 610px;
 }
 
-.aileen-hero h1 {
+.gradio-container .aileen-hero h1 {
   margin: 0 0 10px;
   color: white;
   font-size: 64px;
@@ -216,7 +218,7 @@ gradio-app {
   text-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
-.aileen-hero p {
+.gradio-container .aileen-hero p {
   margin: 0;
   max-width: 560px;
   color: rgba(255, 255, 255, 0.92);
@@ -226,6 +228,8 @@ gradio-app {
 }
 
 .aileen-hero__status {
+  position: relative;
+  z-index: 2;
   width: min(290px, 100%);
   padding: 18px;
   border: 1px solid rgba(255, 255, 255, 0.34);
@@ -236,7 +240,7 @@ gradio-app {
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.12);
 }
 
-.aileen-hero__status span {
+.gradio-container .aileen-hero__status span {
   display: block;
   margin-bottom: 6px;
   color: rgba(255, 255, 255, 0.74);
@@ -245,14 +249,14 @@ gradio-app {
   text-transform: uppercase;
 }
 
-.aileen-hero__status strong {
+.gradio-container .aileen-hero__status strong {
   display: block;
   color: white;
   font-size: 18px;
   line-height: 1.2;
 }
 
-.aileen-hero__status p {
+.gradio-container .aileen-hero__status p {
   margin-top: 8px;
   color: rgba(255, 255, 255, 0.82);
   font-size: 13px;
