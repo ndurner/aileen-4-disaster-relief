@@ -435,19 +435,6 @@ gradio-app {
   box-shadow: 0 6px 16px rgba(20, 107, 128, 0.08) !important;
 }
 
-.aileen-code-output label {
-  display: inline-flex !important;
-  align-items: center !important;
-  width: max-content !important;
-  border: 1px solid rgba(20, 107, 128, 0.16) !important;
-  border-radius: 12px !important;
-  padding: 7px 10px !important;
-  background: rgba(222, 245, 245, 0.92) !important;
-  color: var(--aileen-deep) !important;
-  font-weight: 850 !important;
-  box-shadow: 0 6px 16px rgba(20, 107, 128, 0.08) !important;
-}
-
 .aileen-panel textarea,
 .aileen-panel input {
   background: rgba(255, 255, 255, 0.62) !important;
@@ -675,6 +662,23 @@ button.secondary {
   margin-bottom: 0;
 }
 
+.aileen-post-body {
+  margin-top: 16px;
+  color: #162936;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.aileen-post-body p {
+  margin: 0;
+}
+
+.aileen-empty {
+  color: rgba(28, 58, 69, 0.68);
+  font-style: italic;
+}
+
 .aileen-label-chip {
   display: inline-flex;
   align-items: center;
@@ -685,11 +689,6 @@ button.secondary {
   color: var(--aileen-deep);
   font-size: 13px;
   font-weight: 800;
-}
-
-.aileen-code-output {
-  border-radius: 24px !important;
-  overflow: hidden;
 }
 
 .aileen-download {
@@ -2812,14 +2811,19 @@ def output_markdown(post_body: str, visual_result: VisualWorkflowResult) -> str:
     if overlay_calls:
         overlay_text = str(overlay_calls[-1].arguments.get("overlay_text") or "").strip()
     image_label = escape_html(overlay_text or "Rendered through media tools.")
+    body = post_body.strip()
+    body_html = (
+        f'<p>{escape_html(body).replace("\n", "<br>")}</p>'
+        if body
+        else '<p class="aileen-empty">No post body produced.</p>'
+    )
     return f"""
 <div class="aileen-card aileen-post-shell">
   <h3>Post text</h3>
   <p class="aileen-small">Review before publishing. This was finished from the field package and attached photos.</p>
   <span class="aileen-label-chip">Image label: {image_label}</span>
+  <div class="aileen-post-body">{body_html}</div>
 </div>
-
-{post_body.strip() or "_No post body produced._"}
 """
 
 
@@ -2859,7 +2863,6 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
         summary,
         gr.update(value=visual_result.produced_path, visible=True),
         output_markdown(post_body, visual_result),
-        completed_yaml,
         gr.update(value=zip_path, visible=True),
     )
 
@@ -2920,7 +2923,7 @@ with gr.Blocks(
             <div class="aileen-section-heading">
               <div>
                 <h2>Review</h2>
-                <p>Package status and produced visual appear here.</p>
+                <p>Package status appears here.</p>
               </div>
               <span class="aileen-kicker">Desk</span>
             </div>
@@ -2937,13 +2940,6 @@ with gr.Blocks(
             </div>
             """
         )
-        story_visual = gr.Image(
-            label="Produced visual",
-            type="filepath",
-            height=520,
-            visible=False,
-            elem_classes=["aileen-image-preview"],
-        )
 
     with gr.Group(elem_classes=["aileen-panel", "aileen-results-panel"]):
         gr.HTML(
@@ -2951,31 +2947,31 @@ with gr.Blocks(
             <div class="aileen-section-heading">
               <div>
                 <h2>Finished Post</h2>
-                <p>Caption, completed package text, and export ZIP.</p>
+                <p>Produced visual, caption, and export package.</p>
               </div>
               <span class="aileen-kicker">Output</span>
             </div>
             """
         )
-        output = gr.Markdown()
-        with gr.Row():
-            completed_yaml_output = gr.Code(
-                label="Finished package text",
-                language="yaml",
-                lines=14,
-                elem_classes=["aileen-code-output"],
-            )
-            zip_file = gr.DownloadButton(
-                label="Download completed package",
-                visible=False,
-                elem_classes=["aileen-download"],
-            )
+        story_visual = gr.Image(
+            label="Produced visual",
+            type="filepath",
+            height=520,
+            visible=False,
+            elem_classes=["aileen-image-preview"],
+        )
+        output = gr.HTML()
+        zip_file = gr.DownloadButton(
+            label="Download completed package",
+            visible=False,
+            elem_classes=["aileen-download"],
+        )
 
     sample_button.click(fn=load_sample_package, outputs=package_text)
     complete_button.click(
         fn=complete_package,
         inputs=[package_text, package_file, media_files, background_briefing],
-        outputs=[package_summary_html, story_visual, output, completed_yaml_output, zip_file],
+        outputs=[package_summary_html, story_visual, output, zip_file],
     )
 
 
