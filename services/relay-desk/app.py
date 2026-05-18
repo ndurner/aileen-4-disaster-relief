@@ -2965,7 +2965,7 @@ with gr.Blocks(
                 lines=14,
                 elem_classes=["aileen-code-output"],
             )
-            zip_file = gr.File(
+            zip_file = gr.DownloadButton(
                 label="Download completed package",
                 visible=False,
                 elem_classes=["aileen-download"],
