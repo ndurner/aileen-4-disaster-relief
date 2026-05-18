@@ -27,6 +27,7 @@ CODEX_SCHEMA = LAB_ROOT / "schemas" / "codex_overlay_grade.schema.json"
 DEFAULT_DATASET = REPO_ROOT / "scratch" / "synthetic_testset"
 DEFAULT_OUTPUT_ROOT = Path("/tmp/aileen-overlay-quality")
 CANVAS_SIZE = (1080, 1350)
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
 @dataclass(frozen=True)
@@ -204,7 +205,7 @@ def discover_cases(dataset: Path) -> list[HarnessCase]:
     image_paths = sorted(
         path
         for path in dataset.rglob("*")
-        if path.suffix.lower() in {".jpg", ".jpeg", ".png"} and "contact-sheet" not in path.name
+        if path.suffix.lower() in IMAGE_SUFFIXES and "contact-sheet" not in path.name
     )
     cases: list[HarnessCase] = []
     for image_path in image_paths:
@@ -488,10 +489,13 @@ def run_litert_ios(cases: list[HarnessCase], run_dir: Path, timeout_seconds: int
         shutil.copy2(case.image_path, input_dir / case.image_path.name)
         if case.story_path:
             shutil.copy2(case.story_path, input_dir / f"{case.image_path.stem}.txt")
+    image_inputs = sorted(path for path in input_dir.iterdir() if path.suffix.lower() in IMAGE_SUFFIXES)
+    if not image_inputs:
+        raise RuntimeError(f"No LiteRT image inputs staged under {input_dir}")
     env = os.environ.copy()
     env["AILEEN_GEMMA_LAB_OUT"] = str(run_dir / "litert-ios")
     env["AILEEN_GEMMA_LAB_TIMEOUT_SECONDS"] = str(timeout_seconds)
-    subprocess.run([str(LAB_ROOT / "scripts" / "run_gemma_overlay_lab.sh"), *map(str, sorted(input_dir.iterdir()))], cwd=REPO_ROOT, env=env, check=True)
+    subprocess.run([str(LAB_ROOT / "scripts" / "run_gemma_overlay_lab.sh"), *map(str, image_inputs)], cwd=REPO_ROOT, env=env, check=True)
 
 
 def run_transformers_relay(
