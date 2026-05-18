@@ -43,6 +43,7 @@ Relay Desk treats Desk Mode as a delayed Field Mode run:
 - Output package: `execution.mode: field_completed`
 - Preserved field story: `story.raw`
 - Added generated caption: `story.post_body`
+- Top-level caption text file: `finished-post.txt`
 - Produced media paths under `media/`
 
 When an uploaded or pasted package is already

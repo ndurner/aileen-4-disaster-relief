@@ -2903,11 +2903,19 @@ def output_markdown(post_body: str, visual_result: VisualWorkflowResult | None) 
 """
 
 
-def create_output_zip(completed_yaml: str, produced_visual_path: str) -> str:
+def write_post_body_text(workdir: Path, post_body: str) -> None:
+    text = post_body.strip()
+    if text:
+        text = f"{text}\n"
+    (workdir / "finished-post.txt").write_text(text, encoding="utf-8")
+
+
+def create_output_zip(completed_yaml: str, produced_visual_path: str, post_body: str) -> str:
     workdir = Path(tempfile.mkdtemp(prefix="aileen-relay-desk-"))
     media_dir = workdir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     (workdir / "aileen-job.yaml").write_text(completed_yaml, encoding="utf-8")
+    write_post_body_text(workdir, post_body)
     (media_dir / "media_001.jpg").write_bytes(Path(produced_visual_path).read_bytes())
 
     zip_path = workdir / "aileen-field-completed-package.zip"
@@ -2934,9 +2942,12 @@ def completed_media_filename(package: dict[str, Any], index: int, source_path: s
     return f"media/media_{index + 1:03d}{suffix}"
 
 
-def create_field_completed_output_zip(package: dict[str, Any], completed_yaml: str, assets: list[ProductionAsset]) -> str:
+def create_field_completed_output_zip(
+    package: dict[str, Any], completed_yaml: str, assets: list[ProductionAsset], post_body: str
+) -> str:
     workdir = Path(tempfile.mkdtemp(prefix="aileen-relay-desk-field-completed-"))
     (workdir / "aileen-job.yaml").write_text(completed_yaml, encoding="utf-8")
+    write_post_body_text(workdir, post_body)
 
     used_filenames: set[str] = set()
     for index, asset in enumerate(assets):
@@ -2983,7 +2994,7 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
         produced_visual_paths = create_completed_visuals_from_upload(package, assets)
         post_body = post_body_from_package(package)
         completed_yaml = completed_package_yaml_for_uploaded_media(package, post_body, assets)
-        zip_path = create_field_completed_output_zip(package, completed_yaml, assets)
+        zip_path = create_field_completed_output_zip(package, completed_yaml, assets, post_body)
         summary = package_summary(package, media_files)
         return (
             summary,
@@ -2995,7 +3006,7 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
     visual_result = run_visual_workflow(package, assets, background_briefing)
     post_body = run_post_body_workflow(package, assets, background_briefing)
     completed_yaml = completed_package_yaml(package, post_body, assets)
-    zip_path = create_output_zip(completed_yaml, visual_result.produced_path)
+    zip_path = create_output_zip(completed_yaml, visual_result.produced_path, post_body)
     summary = package_summary(package, media_files)
     return (
         summary,
