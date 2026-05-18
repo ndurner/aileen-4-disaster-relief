@@ -42,7 +42,12 @@ Relay Desk treats Desk Mode as a delayed Field Mode run:
 - Output package: `execution.mode: field_completed`
 - Preserved field story: `story.raw`
 - Added generated caption: `story.post_body`
-- Produced media path: `media/media_001.jpg`
+- Produced media paths under `media/`
+
+When an uploaded or pasted package is already
+`execution.mode: field_completed`, Relay Desk skips Gemma inference on
+**Finish package**. It uses `story.post_body` from the package and copies every
+attached image into the finished post output.
 
 If package provenance rolls up to `synthetic_demo_image`, the produced image is
 stamped with the same small upper-left `AI` disclosure badge used by the iOS

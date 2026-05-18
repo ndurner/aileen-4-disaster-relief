@@ -1151,6 +1151,24 @@ def field_update(package: dict[str, Any]) -> dict[str, str]:
     return {str(key): str(value).strip() for key, value in raw.items() if value is not None}
 
 
+def execution_mode(package: dict[str, Any]) -> str:
+    execution = package.get("execution") or {}
+    if not isinstance(execution, dict):
+        return "remote_generate"
+    return str(execution.get("mode") or "remote_generate").strip()
+
+
+def is_field_completed_package(package: dict[str, Any]) -> bool:
+    return execution_mode(package) == "field_completed"
+
+
+def post_body_from_package(package: dict[str, Any]) -> str:
+    story = package.get("story") or {}
+    if not isinstance(story, dict):
+        return ""
+    return str(story.get("post_body") or "").strip()
+
+
 def media_items(package: dict[str, Any]) -> list[dict[str, Any]]:
     raw = package.get("media") or []
     return raw if isinstance(raw, list) else []
@@ -1190,8 +1208,7 @@ def production_assets(package: dict[str, Any], media_files: list[Any] | None) ->
 
 
 def package_summary(package: dict[str, Any], media_files: list[Any] | None) -> str:
-    execution = package.get("execution") or {}
-    mode = execution.get("mode", "remote_generate") if isinstance(execution, dict) else "remote_generate"
+    mode = execution_mode(package)
     update = field_update(package)
     media = media_items(package)
     uploaded_count = len(media_paths(media_files))
@@ -2790,6 +2807,51 @@ def completed_package_yaml(package: dict[str, Any], post_body: str, assets: list
     return "\n".join(lines) + "\n"
 
 
+def completed_package_yaml_for_uploaded_media(package: dict[str, Any], post_body: str, assets: list[ProductionAsset]) -> str:
+    lines = [
+        "aileen_job_version: 1",
+        "",
+        "execution:",
+        "  mode: field_completed",
+    ]
+    raw_story = story_raw(package)
+    if raw_story or post_body.strip():
+        lines.extend(["", "story:"])
+        if raw_story:
+            lines.append("  raw: |-")
+            lines.extend(yaml_block_lines(raw_story, "    "))
+        if post_body.strip():
+            lines.append("  post_body: |-")
+            lines.extend(yaml_block_lines(post_body.strip(), "    "))
+
+    update = field_update(package)
+    if update:
+        lines.extend(["", "field_update:"])
+        if update.get("location_label"):
+            lines.append(f"  location_label: {yaml_scalar(update['location_label'])}")
+        if update.get("update_time_local"):
+            lines.append(f"  update_time_local: {yaml_scalar(update['update_time_local'])}")
+        if update.get("review_notes"):
+            lines.append("  review_notes: |-")
+            lines.extend(yaml_block_lines(update["review_notes"], "    "))
+
+    lines.extend(["", "media:"])
+    for index, asset in enumerate(assets):
+        lines.append(f"  - id: media_{index + 1:03d}")
+        lines.append(f"    filename: {yaml_scalar(completed_media_filename(package, index, asset.path))}")
+        lines.append("    type: photo")
+        lines.append(f"    source_type: {asset.source_type}")
+        if asset.captured_at:
+            lines.append(f"    captured_at: {yaml_scalar(asset.captured_at)}")
+        if asset.gps:
+            lines.append("    gps:")
+            if "latitude" in asset.gps:
+                lines.append(f"      latitude: {yaml_decimal(asset.gps['latitude'])}")
+            if "longitude" in asset.gps:
+                lines.append(f"      longitude: {yaml_decimal(asset.gps['longitude'])}")
+    return "\n".join(lines) + "\n"
+
+
 def yaml_block_lines(text: str, indentation: str) -> list[str]:
     return [f"{indentation}{line}" for line in text.split("\n")]
 
@@ -2806,8 +2868,12 @@ def yaml_decimal(value: Any) -> str:
         return yaml_scalar(str(value))
 
 
-def output_markdown(post_body: str, visual_result: VisualWorkflowResult) -> str:
-    overlay_calls = [call for call in visual_result.tool_calls if call.name in {"add_text_overlay", "move_text_overlay"}]
+def output_markdown(post_body: str, visual_result: VisualWorkflowResult | None) -> str:
+    overlay_calls = [
+        call
+        for call in (visual_result.tool_calls if visual_result else [])
+        if call.name in {"add_text_overlay", "move_text_overlay"}
+    ]
     overlay_text = ""
     if overlay_calls:
         overlay_text = str(overlay_calls[-1].arguments.get("overlay_text") or "").strip()
@@ -2844,6 +2910,55 @@ def create_output_zip(completed_yaml: str, produced_visual_path: str) -> str:
     return str(zip_path)
 
 
+def completed_media_filename(package: dict[str, Any], index: int, source_path: str) -> str:
+    manifest = media_items(package)
+    item = manifest[index] if index < len(manifest) and isinstance(manifest[index], dict) else {}
+    raw_filename = str(item.get("filename") or "").strip()
+    if raw_filename:
+        candidate = Path(raw_filename)
+        if not candidate.is_absolute() and ".." not in candidate.parts:
+            return candidate.as_posix()
+
+    suffix = Path(source_path).suffix.lower()
+    if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+        suffix = ".jpg"
+    return f"media/media_{index + 1:03d}{suffix}"
+
+
+def create_field_completed_output_zip(package: dict[str, Any], completed_yaml: str, assets: list[ProductionAsset]) -> str:
+    workdir = Path(tempfile.mkdtemp(prefix="aileen-relay-desk-field-completed-"))
+    (workdir / "aileen-job.yaml").write_text(completed_yaml, encoding="utf-8")
+
+    used_filenames: set[str] = set()
+    for index, asset in enumerate(assets):
+        filename = completed_media_filename(package, index, asset.path)
+        if filename in used_filenames:
+            filename = completed_media_filename({}, index, asset.path)
+        used_filenames.add(filename)
+        output_path = workdir / filename
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(Path(asset.path).read_bytes())
+
+    zip_path = workdir / "aileen-field-completed-package.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for file_path in workdir.rglob("*"):
+            if file_path == zip_path or file_path.is_dir():
+                continue
+            archive.write(file_path, file_path.relative_to(workdir))
+    return str(zip_path)
+
+
+def create_completed_visuals_from_upload(package: dict[str, Any], assets: list[ProductionAsset]) -> list[str]:
+    output_dir = Path(tempfile.mkdtemp(prefix="aileen-relay-desk-field-completed-preview-"))
+    output_paths = []
+    for index, asset in enumerate(assets):
+        filename = Path(completed_media_filename(package, index, asset.path)).name
+        output_path = output_dir / filename
+        output_path.write_bytes(Path(asset.path).read_bytes())
+        output_paths.append(str(output_path))
+    return output_paths
+
+
 @spaces.GPU(duration=GPU_SECONDS)
 def complete_package(package_text: str, package_file: Any, media_files: list[Any] | None, background_briefing: str):
     full_text = read_package_text(package_text, package_file)
@@ -2855,6 +2970,19 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
     if not assets:
         raise gr.Error("Attach the transferred photo before finishing the package.")
 
+    if is_field_completed_package(package):
+        produced_visual_paths = create_completed_visuals_from_upload(package, assets)
+        post_body = post_body_from_package(package)
+        completed_yaml = completed_package_yaml_for_uploaded_media(package, post_body, assets)
+        zip_path = create_field_completed_output_zip(package, completed_yaml, assets)
+        summary = package_summary(package, media_files)
+        return (
+            summary,
+            gr.update(value=produced_visual_paths, visible=True),
+            output_markdown(post_body, None),
+            gr.update(value=zip_path, visible=True),
+        )
+
     visual_result = run_visual_workflow(package, assets, background_briefing)
     post_body = run_post_body_workflow(package, assets, background_briefing)
     completed_yaml = completed_package_yaml(package, post_body, assets)
@@ -2862,7 +2990,7 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
     summary = package_summary(package, media_files)
     return (
         summary,
-        gr.update(value=visual_result.produced_path, visible=True),
+        gr.update(value=[visual_result.produced_path], visible=True),
         output_markdown(post_body, visual_result),
         gr.update(value=zip_path, visible=True),
     )
@@ -2953,9 +3081,10 @@ with gr.Blocks(
             </div>
             """
         )
-        story_visual = gr.Image(
-            label="Produced visual",
+        story_visual = gr.Gallery(
+            label="Produced visuals",
             type="filepath",
+            columns=[1, 2, 3],
             height=520,
             visible=False,
             elem_classes=["aileen-image-preview"],
