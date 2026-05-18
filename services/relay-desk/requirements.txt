@@ -1,5 +1,6 @@
 PyYAML>=6.0,<7
 Pillow>=10,<13
+spaces>=0.49,<1
 torch==2.9.1
 torchvision==0.24.1
 accelerate>=1.12,<2

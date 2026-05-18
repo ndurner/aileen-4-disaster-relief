@@ -106,20 +106,17 @@ app_target.resources_build_phase.add_file_reference(asset_ref)
 google_vendor_group = main_group.new_group("GoogleAIEdge", "ThirdParty/GoogleAIEdge")
 litert_ref = google_vendor_group.new_file("ThirdParty/GoogleAIEdge/LiteRTLM.xcframework")
 constraint_ref = google_vendor_group.new_file("ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework")
-metal_ref = google_vendor_group.new_file("ThirdParty/GoogleAIEdge/LiteRtMetalAccelerator.xcframework")
-[litert_ref, constraint_ref, metal_ref].each { |ref| ref.source_tree = "SOURCE_ROOT" }
+[litert_ref, constraint_ref].each { |ref| ref.source_tree = "SOURCE_ROOT" }
 
 app_target.frameworks_build_phase.add_file_reference(litert_ref)
 app_target.frameworks_build_phase.add_file_reference(constraint_ref)
-app_target.frameworks_build_phase.add_file_reference(metal_ref)
 
 embed_phase = project.new(Xcodeproj::Project::Object::PBXCopyFilesBuildPhase)
 embed_phase.name = "Embed Frameworks"
 embed_phase.symbol_dst_subfolder_spec = :frameworks
 app_target.build_phases << embed_phase
 [
-  embed_phase.add_file_reference(constraint_ref, true),
-  embed_phase.add_file_reference(metal_ref, true)
+  embed_phase.add_file_reference(constraint_ref, true)
 ].each do |build_file|
   build_file.settings = {
     "ATTRIBUTES" => ["CodeSignOnCopy", "RemoveHeadersOnCopy"]

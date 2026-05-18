@@ -4,13 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 THIRD_PARTY_DIR="$ROOT_DIR/ThirdParty/GoogleAIEdge"
 LITERTLM_SRC="${1:-}"
-LITERT_PREBUILTS_ZIP="${2:-}"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/aileen-litert.XXXXXX")"
-trap 'rm -rf "$WORK_DIR"' EXIT
+LITERTLM_REPO="${AILEEN_LITERTLM_REPO:-https://github.com/google-ai-edge/LiteRT-LM.git}"
+LITERTLM_REF="${AILEEN_LITERTLM_REF:-v0.10.1}"
 
 if [[ -z "$LITERTLM_SRC" ]]; then
-  echo "usage: $0 /path/to/google-ai-edge-LiteRT-LM [/path/to/google-ai-edge-LiteRT-prebuilts.zip]" >&2
+  echo "usage: $0 /path/to/google-ai-edge-LiteRT-LM" >&2
+  echo "If the LiteRT-LM path does not exist, the script clones $LITERTLM_REPO and checks out AILEEN_LITERTLM_REF (default: $LITERTLM_REF)." >&2
   exit 1
+fi
+
+if [[ ! -e "$LITERTLM_SRC" ]]; then
+  echo "Cloning LiteRT-LM $LITERTLM_REF into $LITERTLM_SRC..."
+  mkdir -p "$(dirname "$LITERTLM_SRC")"
+  git clone "$LITERTLM_REPO" "$LITERTLM_SRC" >/dev/null
+  git -C "$LITERTLM_SRC" checkout "$LITERTLM_REF" >/dev/null
 fi
 
 if [[ ! -f "$LITERTLM_SRC/c/engine.h" ]]; then
@@ -53,7 +60,7 @@ copy_constraint_provider() {
   cp "$dylib_path" "$output_dir/libGemmaModelConstraintProvider.dylib"
 }
 
-echo "Rebuilding a minimal GemmaModelConstraintProvider.xcframework from official LiteRT-LM prebuilts..."
+echo "Rebuilding a minimal GemmaModelConstraintProvider.xcframework from LiteRT-LM checkout prebuilts..."
 rm -rf "$THIRD_PARTY_DIR/GemmaModelConstraintProvider.xcframework"
 mkdir -p \
   "$THIRD_PARTY_DIR/GemmaModelConstraintProvider.xcframework/ios-arm64" \
@@ -106,67 +113,6 @@ cat > "$THIRD_PARTY_DIR/GemmaModelConstraintProvider.xcframework/Info.plist" <<'
 </dict>
 </plist>
 PLIST
-
-if [[ -n "$LITERT_PREBUILTS_ZIP" ]]; then
-  echo "Rebuilding LiteRtMetalAccelerator.xcframework from official LiteRT prebuilts zip..."
-  rm -rf "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework"
-  mkdir -p \
-    "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework/ios-arm64/Headers" \
-    "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework/ios-arm64-simulator/Headers"
-  unzip -q "$LITERT_PREBUILTS_ZIP" \
-    'ios_arm64/libLiteRtMetalAccelerator.dylib' \
-    'ios_sim_arm64/libLiteRtMetalAccelerator.dylib' \
-    -d "$WORK_DIR/extract"
-  cp "$WORK_DIR/extract/ios_arm64/libLiteRtMetalAccelerator.dylib" \
-    "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework/ios-arm64/libLiteRtMetalAccelerator.dylib"
-  cp "$WORK_DIR/extract/ios_sim_arm64/libLiteRtMetalAccelerator.dylib" \
-    "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework/ios-arm64-simulator/libLiteRtMetalAccelerator.dylib"
-  cat > "$THIRD_PARTY_DIR/LiteRtMetalAccelerator.xcframework/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>AvailableLibraries</key>
-  <array>
-    <dict>
-      <key>BinaryPath</key>
-      <string>libLiteRtMetalAccelerator.dylib</string>
-      <key>HeadersPath</key>
-      <string>Headers</string>
-      <key>LibraryIdentifier</key>
-      <string>ios-arm64</string>
-      <key>LibraryPath</key>
-      <string>libLiteRtMetalAccelerator.dylib</string>
-      <key>SupportedArchitectures</key>
-      <array><string>arm64</string></array>
-      <key>SupportedPlatform</key>
-      <string>ios</string>
-    </dict>
-    <dict>
-      <key>BinaryPath</key>
-      <string>libLiteRtMetalAccelerator.dylib</string>
-      <key>HeadersPath</key>
-      <string>Headers</string>
-      <key>LibraryIdentifier</key>
-      <string>ios-arm64-simulator</string>
-      <key>LibraryPath</key>
-      <string>libLiteRtMetalAccelerator.dylib</string>
-      <key>SupportedArchitectures</key>
-      <array><string>arm64</string></array>
-      <key>SupportedPlatform</key>
-      <string>ios</string>
-      <key>SupportedPlatformVariant</key>
-      <string>simulator</string>
-    </dict>
-  </array>
-  <key>CFBundlePackageType</key>
-  <string>XFWK</string>
-  <key>XCFrameworkFormatVersion</key>
-  <string>1.0</string>
-</dict>
-</plist>
-PLIST
-fi
 
 echo "Done. Regenerated Google AI Edge artifacts under:"
 echo "  $THIRD_PARTY_DIR"

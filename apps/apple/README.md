@@ -1,79 +1,221 @@
-# Aileen 4 Disaster Relief Apple App
+# Aileen 4 Apple App
 
-This app target is the Apple-client side of the product:
+This directory contains the Apple client for Aileen 4 Disaster Relief. It builds
+for iPhone, iPad, and Mac as a Designed-for-iPad app.
 
-- iPhone
-- iPad
-- Mac via Designed for iPad
+The app supports:
 
-Current focus:
+- Field Mode
+- Desk Mode
+- Persistent background briefing
+- On-device Gemma 4 E2B/E4B through LiteRT-LM.
+- Hosted Gemma 4 26B A4B/31B through the Gemini API.
+- Apple-native image and reel rendering.
+- Provenance-aware package export, including a deterministic `AI` badge
 
-- persistent background briefing
-- content-production workflow with imported media assets
-- Field Mode for creating finished posts locally or in the cloud
-- Desk Mode for packaging raw media so a teammate can finish later
-- selectable on-device LiteRT-LM or hosted Gemini API processing
-- local Gemma 4 LiteRT model download, import, and discovery for on-device runs
-- Gemini API key and hosted Gemma 4 model settings for cloud runs
-- on-device Apple-native media tool-calling orchestration
-- shareable packages containing raw story inputs, media manifests, pre-render
-  provenance, GPS metadata, and either generated Field Mode outputs or
-  unprocessed Desk Mode media
-- a deterministic upper-left `AI` disclosure badge on finished Field Mode media
-  when source provenance rolls up to `synthetic_demo_image`
+## Open And Build
 
-Open the Xcode project:
+From the repository root, the lowest-friction setup path is:
 
-- `Aileen4DisasterRelief.xcodeproj`
+```bash
+scripts/bootstrap_apple.sh \
+  --build simulator
+```
 
-Regenerate it with:
+The bootstrap clones `google-ai-edge/LiteRT-LM` under `.build/` when needed,
+checks out `AILEEN_LITERTLM_REF` (default: `v0.10.1`), restores the native
+Google AI Edge artifacts, regenerates the Xcode project, and optionally builds.
 
-- `apps/apple/scripts/generate_xcodeproj.rb`
+Open the project:
 
-Apple-specific support files live alongside the app:
+```bash
+open Aileen4DisasterRelief.xcodeproj
+```
 
-- `apps/apple/ThirdParty/GoogleAIEdge/`: generated LiteRT native artifacts from
-  Google-owned upstreams, with provenance notes
-- `apps/apple/scripts/shared/inject_models_to_device.sh`: device model injection
-- `apps/apple/scripts/bootstrap_google_ai_edge_artifacts.sh`: regenerates the
-  Apple binaries from official Google sources instead of relying on opaque local
-  copies
-- `apps/apple/overlay-lab/`: segregated overlay experiments, local render
-  checks, and simulator-driven Gemma overlay runs
-- Settings downloads the pinned LiteRT-LM E2B/E4B model files from the
-  `litert-community` Hugging Face repositories into the same app-managed model
-  folder used by Files imports
-- Cloud production calls the Gemini API with field-mode deadlines for unstable
-  networks, visible stage labels, explicit timeout errors, and a cancel action
-  that unwinds the Production state. Cloud media is uploaded through the Gemini
-  Files API, reused across production turns as `fileData`, and deleted after
-  the run.
+Build from the command line:
 
-## Collaborator Modes
+```bash
+scripts/build_apple_quiet.sh simulator
+```
 
-Field Mode generates here. It runs Gemma 4 on device through LiteRT-LM or in the
-cloud through the Gemini API, then exports `aileen-job.yaml` with
-`execution.mode: field_completed`, generated `story.post_body`, and finished
-media. Image overlay placement uses the shared production correction contract:
-after the first render, the model reviews a clean source/grid/outline guide and
-must return exact sticker slot coordinates or keep a safe current slot. If the
-source media is classified as `synthetic_demo_image`, the app
-stamps the finished image or reel with a small upper-left `AI` disclosure badge
-after the production overlay is rendered.
+Build for a device:
 
-Desk Mode generates later. It skips Gemma 4, exports `aileen-job.yaml` with
-`execution.mode: remote_generate`, keeps the user prompt in `story.raw`, omits
-generated post text, and copies selected media into `media/` unchanged.
-The app keeps location, update time, and review notes behind an optional details
-section. Time can use image metadata by default, while location defaults to
-omitted and can be switched to image-derived or manual when useful. Export
-copies the YAML package text to the clipboard and shares media files separately
-on iOS, which is intended for messenger handoff workflows.
+```bash
+scripts/build_apple_quiet.sh device:<device-id>
+```
 
-## Checkout Bootstrap
+The project targets iOS 17 and Swift 6. Simulator builds require Apple Silicon
+because the local LiteRT artifacts are arm64-only and the generated project
+excludes x86_64 simulator builds.
 
-The Google AI Edge xcframeworks under `apps/apple/ThirdParty/GoogleAIEdge/`
-are intentionally not stored in Git history. After a fresh clone, restore them
-locally with:
+## Generated Xcode Project
 
-- `apps/apple/scripts/bootstrap_google_ai_edge_artifacts.sh /path/to/google-ai-edge-LiteRT-LM [/path/to/google-ai-edge-LiteRT-prebuilts.zip]`
+`Aileen4DisasterRelief.xcodeproj` is generated by:
+
+```bash
+ruby scripts/generate_xcodeproj.rb
+```
+
+If the `xcodeproj` Ruby gem is missing, install it in your local Ruby
+environment before regenerating. Durable project changes belong in
+`scripts/generate_xcodeproj.rb`, not directly in `project.pbxproj`.
+
+The generator currently wires in:
+
+- Swift files directly under `Aileen4DisasterRelief/Sources/AppModule/`
+- Swift overlay-lab hooks under `Aileen4DisasterRelief/Sources/OverlayLab/`
+- the LiteRT-LM shim
+- the bridging header
+- the app asset catalog
+- Google AI Edge xcframework references under `ThirdParty/GoogleAIEdge/`
+
+## Required Native Artifacts
+
+The app consumes LiteRT-LM through an Objective-C++ shim and generated
+Google AI Edge xcframeworks. A Git checkout only contains the tracked README in
+the artifact directory; the actual frameworks are ignored because they are large
+generated artifacts.
+The tracked `ThirdParty/GoogleAIEdge/README.md` describes the expected artifact
+shape.
+
+Before building from a clean checkout, make sure these directories exist:
+
+```text
+ThirdParty/GoogleAIEdge/LiteRTLM.xcframework
+ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework
+```
+
+The top-level bootstrap creates them from a pinned LiteRT-LM source checkout.
+For local iteration, pass `--litert-src /path/to/google-ai-edge-LiteRT-LM` to
+reuse an existing checkout. The checked-in app flow is the working, complete
+product path for image/text Field Mode and Desk Mode handoff.
+
+If intentionally regenerating, use official Google AI Edge inputs:
+
+```bash
+scripts/bootstrap_google_ai_edge_artifacts.sh \
+  /path/to/google-ai-edge-LiteRT-LM
+```
+
+The first argument must point at a LiteRT-LM checkout with `c/engine.h`. The
+script needs `bazel` or `bazelisk` to build `LiteRTLM.xcframework`. If the
+first path does not exist, the script clones `google-ai-edge/LiteRT-LM` and
+checks out `AILEEN_LITERTLM_REF`, defaulting to the stable `v0.10.1` tag.
+
+The current shim creates LiteRT-LM sessions with CPU text and vision backends
+by default. That choice is intentional: it keeps the hackathon demo path stable
+while still letting experiments opt into backend overrides with environment
+variables.
+
+Useful LiteRT shim overrides:
+
+```bash
+GEMMA_LITERT_TEXT_BACKEND=cpu
+GEMMA_LITERT_VISION_BACKEND=cpu
+GEMMA_LITERT_MAX_OUTPUT_TOKENS=1200
+GEMMA_LITERT_MAX_NUM_TOKENS=8192
+GEMMA_LITERT_CONSTRAINED_DECODING=1
+AILEEN_GEMMA_BRIDGE_DEBUG=1
+```
+
+## Gemma Model Files
+
+Large `.litertlm` files are not committed. The app can load models from:
+
+- Settings downloads from pinned `litert-community` Hugging Face revisions.
+- Files imports into the app-managed `Documents/DownloadedModels` folder.
+- Development injection into `Library/Application Support/Models`.
+
+Expected filenames:
+
+```text
+gemma-4-E2B-it.litertlm
+gemma-4-E4B-it.litertlm
+```
+
+Development injection:
+
+```bash
+xcrun devicectl list devices
+scripts/shared/inject_models_to_device.sh \
+  <device-id> \
+  de.ndurner.Aileen4DisasterRelief \
+  /path/to/gemma-4-E2B-it.litertlm \
+  /path/to/gemma-4-E4B-it.litertlm
+```
+
+Re-running the injection command is cheap. The script writes a small manifest
+next to the injected files and prints `Reusing injected ...` when the remote
+copy already matches.
+
+For a Designed-for-iPad build launched on Mac, copy models into the running app
+sandbox if Settings download/import is not convenient:
+
+```bash
+APP_PID="$(ps aux | awk '/[A]ileen4DisasterRelief.app\/Aileen4DisasterRelief/{print $2; exit}')"
+APP_HOME="$(ps eww -p "$APP_PID" | tr ' ' '\n' | sed -n 's/^HOME=//p' | head -n1)"
+
+mkdir -p "$APP_HOME/Library/Application Support/Models"
+cp /path/to/gemma-4-E2B-it.litertlm \
+  "$APP_HOME/Library/Application Support/Models/"
+```
+
+Restart the app after copying so Settings re-reads model availability.
+
+## Cloud Path
+
+Cloud production uses the Gemini API, not Vertex AI or OpenRouter. Enter a
+Gemini API key in Settings, then select hosted Gemma models for visual and text
+generation:
+
+```text
+gemma-4-26b-a4b-it
+gemma-4-31b-it
+```
+
+The app uploads selected images through the Gemini Files API, references them
+from `generateContent` as `fileData`, and deletes uploaded files after the
+production run.
+
+## Package Behavior
+
+Field Mode exports `aileen-job.yaml` with:
+
+- `execution.mode: field_completed`
+- original `story.raw`
+- generated `story.post_body`
+- produced media under `media/`
+
+Desk Mode exports `aileen-job.yaml` with:
+
+- `execution.mode: remote_generate`
+- original `story.raw`
+- optional field update details and review notes
+- unprocessed selected media under `media/`
+
+Relay Desk consumes Desk Mode packages and exports the same completed package
+shape as Field Mode for still images.
+
+## Overlay Lab
+
+Keep overlay experiments out of the main app flow unless they are intentionally
+productized:
+
+- app-side hooks: `Aileen4DisasterRelief/Sources/OverlayLab/`
+- scripts, fixtures, and lab notes: `overlay-lab/`
+
+Run local overlay tools from the repo root:
+
+```bash
+apps/apple/overlay-lab/scripts/overlay_lab.sh analyze /tmp/insta-samples/*
+apps/apple/overlay-lab/scripts/run_gemma_overlay_lab.sh /tmp/test-imgs/*
+```
+
+Build the Kaggle-ready overlay-placement benchmark:
+
+```bash
+services/relay-desk/.venv/bin/python \
+  apps/apple/overlay-lab/scripts/build_kaggle_overlay_dataset.py \
+  --clean \
+  --dataset-id YOUR_KAGGLE_USERNAME/aileen-overlay-placement-benchmark
+```
