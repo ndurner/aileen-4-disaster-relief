@@ -464,6 +464,10 @@ final class ProductionWorkflowViewModel: ObservableObject {
         UIPasteboard.general.string = postBodyText
     }
 
+    func copyPackageYAMLToPasteboard() throws {
+        _ = try prepareExportDirectory()
+    }
+
     private func makeProductionAssets() -> [ProductionAssetDescriptor] {
         assets.enumerated().map { offset, asset in
             ProductionAssetDescriptor(toolID: "asset_\(offset + 1)", mediaAsset: asset)

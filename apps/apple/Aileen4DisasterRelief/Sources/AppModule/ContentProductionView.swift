@@ -492,6 +492,16 @@ struct ContentProductionView: View {
             }
             .buttonStyle(OceanSecondaryButtonStyle())
             .disabled(viewModel.postBodyText.isEmpty)
+        } else {
+            Button("Copy text") {
+                do {
+                    try viewModel.copyPackageYAMLToPasteboard()
+                } catch {
+                    viewModel.latestError = error.localizedDescription
+                }
+            }
+            .buttonStyle(OceanSecondaryButtonStyle())
+            .disabled(!hasDeskHandoffReady)
         }
     }
 
