@@ -29,6 +29,7 @@ def env_bool(name: str, default: bool) -> bool:
 APP_ROOT = Path(__file__).resolve().parent
 ASSET_ROOT = APP_ROOT / "assets"
 SAMPLE_PACKAGE_PATH = APP_ROOT / "samples" / "aileen-job.yaml"
+SAMPLE_IMAGE_PATH = ASSET_ROOT / "sample-lizard-recovery-pen.png"
 MODEL_ID = os.environ.get("AILEEN_RELAY_MODEL_ID", "google/gemma-4-E2B-it")
 ENABLE_THINKING = env_bool("AILEEN_RELAY_ENABLE_THINKING", True)
 MAX_NEW_TOKENS = int(os.environ.get("AILEEN_RELAY_MAX_NEW_TOKENS", "1200" if ENABLE_THINKING else "900"))
@@ -1052,8 +1053,8 @@ class GeneratedResponse:
     thought_text: str
 
 
-def load_sample_package() -> str:
-    return SAMPLE_PACKAGE_PATH.read_text(encoding="utf-8")
+def load_sample_inputs() -> tuple[str, list[str]]:
+    return SAMPLE_PACKAGE_PATH.read_text(encoding="utf-8"), [str(SAMPLE_IMAGE_PATH)]
 
 
 def hero_html() -> str:
@@ -2966,7 +2967,7 @@ with gr.Blocks(
             elem_classes=["aileen-download"],
         )
 
-    sample_button.click(fn=load_sample_package, outputs=package_text)
+    sample_button.click(fn=load_sample_inputs, outputs=[package_text, media_files])
     complete_button.click(
         fn=complete_package,
         inputs=[package_text, package_file, media_files, background_briefing],

@@ -21,7 +21,9 @@ the field app would have run locally.
 
 The operator loads `aileen-job.yaml`, attaches the media that travelled with the
 handoff, optionally adds the background briefing, reviews the generated result,
-and downloads a completed package for posting on social media.
+and downloads a completed package for posting on social media. Use **Load
+sample** to populate both the demo package and included sample synthetic photo
+for a no-extra-material trial run.
 
 Relay Desk produces:
 
