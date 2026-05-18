@@ -113,7 +113,7 @@ def main() -> int:
 
     cases = collect_cases(args.source, args.out)
     if not cases:
-        raise SystemExit(f"No active synthetic PNG cases found in {args.source}")
+        raise SystemExit(f"No PNG cases with matching .txt stories found in {args.source}")
 
     copy_assets(cases, args.out)
     write_cases(cases, args.out)
@@ -129,7 +129,7 @@ def main() -> int:
 
 def collect_cases(source: Path, output_root: Path) -> list[CaseRecord]:
     cases: list[CaseRecord] = []
-    for image in sorted(source.glob("SYN_*.png")):
+    for image in sorted(source.glob("*.png")):
         story = image.with_suffix(".txt")
         if not story.exists():
             continue
@@ -149,7 +149,7 @@ def collect_cases(source: Path, output_root: Path) -> list[CaseRecord]:
                 width=width,
                 height=height,
                 split="test",
-                source_type="synthetic_ai_generated_with_c2pa_expectation",
+                source_type=source_type(case_id),
                 situation=situation,
                 subject_focus=focus,
                 keep_clear_hint=keep_clear,
@@ -164,8 +164,19 @@ def image_size(path: Path) -> tuple[int, int]:
 
 
 def subject_hint(case_id: str) -> tuple[str, str]:
-    key = re.sub(r"^SYN_\d+_", "", case_id)
+    key = re.sub(r"^(SYN_ORIG_|SYN_|VAL_)", "", case_id)
+    key = re.sub(r"^\d+_", "", key)
     return SUBJECT_HINTS.get(key, ("main subject and working area", "Avoid faces, bodies, hands, animals, tools, and field evidence."))
+
+
+def source_type(case_id: str) -> str:
+    if case_id.startswith("VAL_"):
+        return "private_validation_photo_sanitized_png"
+    if case_id.startswith("SYN_ORIG_"):
+        return "synthetic_original_jpeg_sanitized_png"
+    if case_id.startswith("SYN_"):
+        return "synthetic_png_sanitized_png"
+    return "sanitized_png"
 
 
 def copy_assets(cases: list[CaseRecord], output_root: Path) -> None:
