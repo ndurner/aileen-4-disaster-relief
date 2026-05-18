@@ -30,7 +30,7 @@ APP_ROOT = Path(__file__).resolve().parent
 ASSET_ROOT = APP_ROOT / "assets"
 SAMPLE_PACKAGE_PATH = APP_ROOT / "samples" / "aileen-job.yaml"
 SAMPLE_IMAGE_PATH = ASSET_ROOT / "sample-lizard-recovery-pen.png"
-MODEL_ID = os.environ.get("AILEEN_RELAY_MODEL_ID", "google/gemma-4-E2B-it")
+MODEL_ID_REQUEST = os.environ.get("AILEEN_RELAY_MODEL_ID", "").strip()
 ENABLE_THINKING = env_bool("AILEEN_RELAY_ENABLE_THINKING", True)
 MAX_NEW_TOKENS = int(os.environ.get("AILEEN_RELAY_MAX_NEW_TOKENS", "1200" if ENABLE_THINKING else "900"))
 GPU_SECONDS = int(os.environ.get("AILEEN_RELAY_GPU_SECONDS", "180"))
@@ -58,6 +58,14 @@ def select_torch_device(requested_device: str) -> torch.device:
     raise RuntimeError(f"AILEEN_RELAY_DEVICE={requested_device!r} is not available. Expected one of: {expected}.")
 
 
+def select_model_id(model_device: torch.device) -> str:
+    if MODEL_ID_REQUEST:
+        return MODEL_ID_REQUEST
+    if model_device.type == "mps":
+        return "google/gemma-4-E2B-it"
+    return "google/gemma-4-E4B-it"
+
+
 _processor: Any | None = None
 _model: Any | None = None
 
@@ -68,6 +76,7 @@ def model_bundle() -> tuple[Any, Any]:
         return _processor, _model
 
     model_device = select_torch_device(DEVICE_REQUEST)
+    model_id = select_model_id(model_device)
     model_dtype = torch.float16 if model_device.type == "mps" else "auto"
     model_load_kwargs: dict[str, Any] = {
         "dtype": model_dtype,
@@ -75,10 +84,10 @@ def model_bundle() -> tuple[Any, Any]:
     if model_device.type == "cuda":
         model_load_kwargs["device_map"] = "auto"
 
-    print(f"Aileen Relay Desk loading {MODEL_ID} on {model_device.type} with dtype={model_dtype}.", flush=True)
-    _processor = AutoProcessor.from_pretrained(MODEL_ID)
+    print(f"Aileen Relay Desk loading {model_id} on {model_device.type} with dtype={model_dtype}.", flush=True)
+    _processor = AutoProcessor.from_pretrained(model_id)
     _model = AutoModelForMultimodalLM.from_pretrained(
-        MODEL_ID,
+        model_id,
         **model_load_kwargs,
     )
     if model_device.type != "cuda":

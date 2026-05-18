@@ -7,6 +7,7 @@ sdk_version: 6.14.0
 python_version: 3.12.12
 app_file: app.py
 models:
+  - google/gemma-4-E2B-it
   - google/gemma-4-E4B-it
 preload_from_hub:
   - google/gemma-4-E4B-it
@@ -62,7 +63,8 @@ Dockerfile Space for the current deployment path.
 Main runtime pieces:
 
 - `spaces.GPU` wraps the package-completion function.
-- `google/gemma-4-E4B-it` is the default model.
+- `google/gemma-4-E4B-it` is the default model for CUDA and CPU.
+- `google/gemma-4-E2B-it` is the default model for local MPS.
 - `AutoProcessor` and `AutoModelForMultimodalLM` provide the Transformers path.
 - PyTorch runs on the ZeroGPU allocation in Space deployment.
 - Pillow renders the overlay image.
@@ -75,8 +77,8 @@ Hugging Face token as a Space secret.
 
 ## Run Locally
 
-Local execution uses the same Python path as the Space and downloads the model
-weights on first generation:
+Local execution uses the same Python path as the Space and downloads the selected
+model weights on first generation:
 
 ```bash
 cd services/relay-desk
@@ -87,7 +89,9 @@ python app.py
 ```
 
 On Apple Silicon, local execution selects PyTorch MPS automatically before
-falling back to CPU. Override the device when needed:
+falling back to CPU. The default model follows the active device: MPS uses
+`google/gemma-4-E2B-it`; CUDA, ZeroGPU, and CPU use `google/gemma-4-E4B-it`.
+Override the device when needed:
 
 ```bash
 AILEEN_RELAY_DEVICE=mps python app.py
@@ -100,7 +104,7 @@ MPS operators can fall back instead of aborting the run.
 Useful environment variables:
 
 ```bash
-AILEEN_RELAY_MODEL_ID=google/gemma-4-E4B-it
+AILEEN_RELAY_MODEL_ID=google/gemma-4-E4B-it  # explicit override
 AILEEN_RELAY_ENABLE_THINKING=1
 AILEEN_RELAY_MAX_NEW_TOKENS=1200
 AILEEN_RELAY_GPU_SECONDS=180

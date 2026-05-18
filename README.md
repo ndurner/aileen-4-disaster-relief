@@ -178,9 +178,10 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Local execution uses the same Python code path as the Space and downloads
-`google/gemma-4-E4B-it` on first generation. On Apple Silicon, it selects MPS
-automatically when available; override with:
+Local execution uses the same Python code path as the Space and downloads the
+selected model on first generation. On Apple Silicon, it selects MPS
+automatically when available and uses `google/gemma-4-E2B-it`; CUDA, ZeroGPU,
+and CPU use `google/gemma-4-E4B-it`. Override the device with:
 
 ```bash
 AILEEN_RELAY_DEVICE=cpu python app.py
