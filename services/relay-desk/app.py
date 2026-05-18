@@ -1123,7 +1123,7 @@ def read_package_text(pasted_text: str, package_file: Any) -> str:
     path = uploaded_path(package_file)
     if path:
         return Path(path).read_text(encoding="utf-8")
-    return load_sample_package()
+    return ""
 
 
 def parse_package(package_text: str) -> tuple[dict[str, Any], str | None]:
@@ -2898,7 +2898,6 @@ with gr.Blocks(
         )
         package_text = gr.Textbox(
             label="Or paste package text",
-            value=load_sample_package(),
             lines=14,
             max_lines=24,
             placeholder="Paste the package text copied from the field app.",
