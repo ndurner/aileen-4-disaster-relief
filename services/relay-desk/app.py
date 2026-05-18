@@ -29,7 +29,7 @@ def env_bool(name: str, default: bool) -> bool:
 APP_ROOT = Path(__file__).resolve().parent
 ASSET_ROOT = APP_ROOT / "assets"
 SAMPLE_PACKAGE_PATH = APP_ROOT / "samples" / "aileen-job.yaml"
-MODEL_ID = os.environ.get("AILEEN_RELAY_MODEL_ID", "google/gemma-4-E4B-it")
+MODEL_ID = os.environ.get("AILEEN_RELAY_MODEL_ID", "google/gemma-4-E2B-it")
 ENABLE_THINKING = env_bool("AILEEN_RELAY_ENABLE_THINKING", True)
 MAX_NEW_TOKENS = int(os.environ.get("AILEEN_RELAY_MAX_NEW_TOKENS", "1200" if ENABLE_THINKING else "900"))
 GPU_SECONDS = int(os.environ.get("AILEEN_RELAY_GPU_SECONDS", "180"))
@@ -2867,9 +2867,10 @@ def complete_package(package_text: str, package_file: Any, media_files: list[Any
 gr.set_static_paths(paths=[ASSET_ROOT])
 
 
+THEME = gr.themes.Soft(primary_hue="teal", secondary_hue="cyan", neutral_hue="slate")
+
+
 with gr.Blocks(
-    css=CSS,
-    theme=gr.themes.Soft(primary_hue="teal", secondary_hue="cyan", neutral_hue="slate"),
     title="Aileen Relay Desk",
 ) as demo:
     gr.HTML(hero_html())
@@ -2979,4 +2980,4 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.queue(max_size=16).launch()
+    demo.queue(max_size=16).launch(css=CSS, theme=THEME)

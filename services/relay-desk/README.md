@@ -3,7 +3,7 @@ title: Aileen Relay Desk
 colorFrom: green
 colorTo: blue
 sdk: gradio
-sdk_version: 5.50.0
+sdk_version: 6.14.0
 python_version: 3.12.12
 app_file: app.py
 models:
@@ -48,7 +48,7 @@ renderer.
 
 ## Runtime Shape
 
-This Space is configured for the Gradio SDK with ZeroGPU hardware. Use the
+This Space is configured for the Gradio 6 SDK with ZeroGPU hardware. Use the
 Space hardware settings to select ZeroGPU; do not convert this app to a
 Dockerfile Space for the current deployment path.
 
