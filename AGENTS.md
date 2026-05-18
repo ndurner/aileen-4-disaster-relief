@@ -1,6 +1,6 @@
 This repository consists of two projects:
     - the iOS app in apps/apple
-    - the datacenter part in services/datacenter (not implemented)
+    - the Gradio app in services/relay-desk
 
 Local Gemma 4 model files:
     - On this workstation, Gemma 4 LiteRT-LM model files are stashed outside the repo in:
@@ -12,7 +12,7 @@ Local Gemma 4 model files:
 
 README maintenance:
     - Keep README files in sync with product behavior, supported runtimes, setup commands, and architecture changes.
-    - When changing model providers, API surfaces, media rendering paths, project generation, folder organization, or developer workflows, check whether the root `README.md`, `apps/apple/README.md`, `apps/apple/overlay-lab/README.md`, or `services/datacenter/README.md` also need updates.
+    - When changing model providers, API surfaces, media rendering paths, project generation, folder organization, or developer workflows, check whether the root `README.md`, `apps/apple/README.md` or `apps/apple/overlay-lab/README.md` also need updates.
     - Prefer documenting the actual runtime/API surface over where credentials or artifacts were obtained. For example, cloud Gemma calls should be described as Gemini API usage unless the Google AI Studio product surface itself is material.
     - Remove or rewrite stale roadmap wording when implementation takes a different path; do not leave obsolete "future" or "incomplete" notes in place after the feature lands differently.
 
