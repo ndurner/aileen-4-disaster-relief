@@ -16,61 +16,60 @@ startup_duration_timeout: 1h
 # Aileen Relay Desk
 
 Relay Desk is the trusted-recipient browser app for Aileen Desk Mode packages.
-It opens the field package, accepts the media that travelled with it, finishes
-the same picture and post-text workflow the field app would have run, and
-exports the completed package.
+It lets someone with better connectivity and more time finish the same workflow
+the field app would have run locally.
 
-It prepares:
+The operator loads `aileen-job.yaml`, attaches the media that travelled with the
+handoff, optionally adds the background briefing, reviews the generated result,
+and downloads a completed package for posting on social media.
 
-- overlaid story visual rendered from the attached photo
+Relay Desk produces:
+
+- an overlaid story image
 - post text
-- downloadable ZIP with `aileen-job.yaml` and produced media under `media/`
+- a ZIP containing `aileen-job.yaml` and produced media under `media/`
 
-When the package media provenance rolls up to `synthetic_demo_image`, Relay Desk
-stamps the finished story visual with the same small upper-left `AI` disclosure
-badge used by the iOS Field Mode renderer.
+In Space deployment it runs Gemma 4 E4B through Transformers on Hugging Face
+ZeroGPU, then renders the final still image with Pillow.
 
-The browser UI mirrors the iOS app's ocean-light production surface. Static UI
-artwork lives under `assets/` and is served with Gradio static paths; it is not
-part of the completed field package export.
+## Package Contract
 
-`PARITY.md` records the iOS/Relay Desk behavior contract. Relay Desk treats a
-Desk Mode package as a delayed Field Mode run, not as a separate artifact type.
-The exported ZIP writes `execution.mode: field_completed`, preserves
-`story.raw`, adds `story.post_body`, and points the single produced still image
-at `media/media_001.jpg`.
+Relay Desk treats Desk Mode as a delayed Field Mode run:
 
-## ZeroGPU Shape
+- Input package: `execution.mode: remote_generate`
+- Output package: `execution.mode: field_completed`
+- Preserved field story: `story.raw`
+- Added generated caption: `story.post_body`
+- Produced media path: `media/media_001.jpg`
 
-This app is built for a Hugging Face Gradio Space using ZeroGPU hardware.
-Select ZeroGPU in the Space hardware settings.
+If package provenance rolls up to `synthetic_demo_image`, the produced image is
+stamped with the same small upper-left `AI` disclosure badge used by the iOS
+renderer.
 
-The app uses:
+## Runtime Shape
 
-- `spaces.GPU` on the package-completion function
-- `google/gemma-4-E4B-it`
-- `AutoProcessor` and `AutoModelForMultimodalLM`
-- PyTorch on the ZeroGPU allocation in Space deployment
-- Pillow for the local story-image overlay
-- Debian font packages from `packages.txt`
+This Space is configured for the Gradio SDK with ZeroGPU hardware. Use the
+Space hardware settings to select ZeroGPU; do not convert this app to a
+Dockerfile Space for the current deployment path.
 
-It does not call Gemini, does not shell out to a local command, and does not use
-Apple frameworks in Space deployment.
+Main runtime pieces:
 
-ZeroGPU is Gradio-SDK only, so this Space does not use a Dockerfile. System
-packages such as fonts belong in `packages.txt`; Hugging Face installs each line
-with `apt-get install` during the Space build.
+- `spaces.GPU` wraps the package-completion function.
+- `google/gemma-4-E4B-it` is the default model.
+- `AutoProcessor` and `AutoModelForMultimodalLM` provide the Transformers path.
+- PyTorch runs on the ZeroGPU allocation in Space deployment.
+- Pillow renders the overlay image.
+- `packages.txt` installs Debian font packages during the Space build.
 
-Gemma 4 E4B is preloaded by the Space runtime but lazy-loaded by the Python app.
-Importing `app.py` builds the Gradio UI and batchable workflow functions without
-constructing the model. The model is loaded on the first generation request. If
-the model requires authenticated access in the deployment account, add the
-appropriate Hugging Face token as a Space secret.
+The model is lazy-loaded on the first generation request. Importing `app.py`
+builds the Gradio UI and workflow functions without constructing Gemma. If the
+deployment account needs authenticated access to the model, add the required
+Hugging Face token as a Space secret.
 
 ## Run Locally
 
-Local execution uses the same Python path as the Space and will download the
-model weights:
+Local execution uses the same Python path as the Space and downloads the model
+weights on first generation:
 
 ```bash
 cd services/relay-desk
@@ -91,7 +90,25 @@ Valid values are `auto`, `mps`, `cuda`, and `cpu`, subject to local PyTorch
 support. The app sets `PYTORCH_ENABLE_MPS_FALLBACK=1` by default so unsupported
 MPS operators can fall back instead of aborting the run.
 
-Run the production workflow in batch mode without launching Gradio:
+Useful environment variables:
+
+```bash
+AILEEN_RELAY_MODEL_ID=google/gemma-4-E4B-it
+AILEEN_RELAY_ENABLE_THINKING=1
+AILEEN_RELAY_MAX_NEW_TOKENS=1200
+AILEEN_RELAY_GPU_SECONDS=180
+AILEEN_RELAY_DEVICE=auto
+```
+
+Disable thinking only for explicit comparisons:
+
+```bash
+AILEEN_RELAY_ENABLE_THINKING=0 python app.py
+```
+
+## Batch Harness
+
+Run the production workflow without launching Gradio:
 
 ```bash
 python relay_batch.py \
@@ -101,3 +118,7 @@ python relay_batch.py \
 ```
 
 Use `--dry-run` to validate dataset discovery without loading Gemma.
+
+Batch runs capture raw model responses and extracted thinking traces so prompt,
+tool-call, and placement failures can be compared against iOS and simulator
+artifacts.

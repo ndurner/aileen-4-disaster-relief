@@ -1,295 +1,166 @@
 # Aileen 4 Disaster Relief
 
-`Aileen 4 Disaster Relief` is a product workspace for disaster-relief media
-operations.
+Aileen 4 is a responder-controlled communications assistant for disaster-relief
+teams. It helps a field operator turn a short situational update and selected
+media into a reviewed public post when connectivity, battery, and attention are
+scarce.
 
-The current implementation is an Apple client that can:
+The product is deliberately not an auto-poster. A human writes or approves the
+briefing, chooses the media, reviews the output, and decides what gets
+published.
 
-- keep a persistent operational background briefing
-- import photos and videos from Camera Roll or Files
-- assemble social-media images and reels from selected media
-- use Gemma 4 either on device through LiteRT-LM or in the cloud through the
-  Gemini API
-- run a tool-calling production workflow that renders overlays with
-  Apple-native media frameworks
-- generate shareable visual outputs and accompanying post text
-- export Desk Mode packages that can be completed in a browser by the Relay Desk
+## What It Does
 
-The repository also contains a Gradio Relay Desk for trusted recipients who have
-connectivity and can complete or review a field package in a browser.
+- Keeps a persistent background briefing for the organization, audience, tone,
+  and safety constraints.
+- Imports photos and videos from Camera Roll or Files.
+- Produces a social-media visual plus post text from a field update.
+- Runs Gemma 4 either on device through LiteRT-LM or in the cloud through the
+  Gemini API.
+- Packages a Desk Mode handoff when field conditions are too constrained for
+  local generation.
+- Lets a trusted relay person finish that handoff in a browser with the Gradio
+  Relay Desk.
+- Preserves source-media provenance, broad location/time context, and review
+  notes in a YAML package that can survive messenger and satellite handoffs.
 
-## Status
+## Product Flow
 
-Current repository state:
+Field Mode creates the post right on the Apple device. By default, Gemma 4
+E2B handles the visual overlay workflow and Gemma 4 E4B handles post text. The
+model proposes tool calls; deterministic media code renders the pixels. The results are assembled in a Handoff Package, ready to be sent to the Trusted Relay person.
 
-- Apple app scaffold is in place for iPhone, iPad, and Designed-for-iPad on Mac
-- the Apple app supports on-device inference through a LiteRT-LM bridge built
-  around the high-level Conversation JSON interface
-- the Apple app also supports hosted Gemma 4 models through the Gemini API
-- Settings can download, import, or discover injected `.litertlm` files for
-  local on-device runs
-- the content-production workflow is implemented as the main product flow
-- image and video overlay rendering uses Apple frameworks such as AVFoundation,
-  CoreImage, CoreGraphics, ImageIO, and UIKit rather than a bundled FFmpeg
-  runtime
-- overlay experimentation is separated into the overlay lab so prompt and
-  tool-contract work stays auditable
-- the Relay Desk Gradio app is available as the trusted-recipient browser app
-  for completing Desk Mode packages locally and reviewing Field Mode handoffs
+Desk Mode creates the Handoff Package from raw inputs instead of running inference on-device. The package
+contains the raw story, optional field details, review notes, media manifest,
+and unprocessed media. A trusted recipient opens it in Relay Desk, attaches the
+transferred media, runs Gemma 4 E4B (e.g. on Hugging Face ZeroGPU), reviews the result,
+and exports the completed package.
 
-Still intentionally incomplete:
-
-- datacenter service implementation
-- production hardening and deployment setup
-- overlay prompt and tool-contract quality work, especially around placement
-  judgment
+Cloud mode is available from the Apple app when connectivity can support it. It
+uses the Gemini API `generateContent` endpoint with hosted Gemma 4 models and
+the same tool contract as the on-device path.
 
 ## Repository Layout
 
 ```text
 .
-├── apps/
-│   └── apple/                  # Apple client app and Apple-only helpers
-├── services/
-│   ├── datacenter/             # Future server-side product
-│   └── relay-desk/             # Gradio trusted-recipient web app
-└── scratch/                    # Ignored local experiments and validation data
+├── apps/apple/              # iPhone, iPad, and Designed-for-iPad-on-Mac app
+├── services/relay-desk/     # Gradio app for trusted-recipient completion
+└── scratch/                 # Ignored local experiments and validation data
 ```
 
-More specifically:
+The Apple app owns the production client experience. Relay Desk is the
+browser-accessible continuation of either Field or Desk mode.
 
-- `apps/apple/`
-  The main Apple app project, including its generated Xcode project, model
-  injection helper, overlay lab, and Apple-specific third-party runtime setup.
-- `apps/apple/Aileen4DisasterRelief/Sources/AppModule/`
-  Production app Swift sources for briefing, settings, content production,
-  Gemini API access, LiteRT-LM, and Apple media tooling.
-- `apps/apple/Aileen4DisasterRelief/Sources/OverlayLab/`
-  App-side automation hooks used by overlay experiments.
-- `apps/apple/overlay-lab/`
-  Local overlay-rendering and simulator-driven benchmark scripts.
-- `apps/apple/ThirdParty/GoogleAIEdge/`
-  Generated LiteRT-related artifacts derived from official Google AI Edge
-  upstreams. These are documented as generated artifacts, not hand-authored
-  source, and the large xcframeworks are restored locally after checkout.
-- `services/datacenter/`
-  Reserved for the future datacenter-side implementation, which is expected to
-  use different serving/runtime choices than the Apple app.
-- `services/relay-desk/`
-  Gradio app for opening a field package, completing the desk-side Gemma 4 E4B
-  path on Hugging Face ZeroGPU, rendering the overlaid story visual, generating
-  the post text, and exporting the completed package.
-- `.model-cache-stash/`
-  Optional ignored local model cache if you choose to keep model files near the
-  repo. Do not commit model files.
-
-## Apple App
-
-The Apple app lives in:
-
-- `apps/apple/Aileen4DisasterRelief.xcodeproj`
-
+## Quick Start: Apple App
 The Xcode project is generated by:
-
-- `apps/apple/scripts/generate_xcodeproj.rb`
-
-Do not make durable project-structure changes only in
-`project.pbxproj`; update the generator and regenerate the project.
-
-Current product areas in the app:
-
-- `Background briefing`
-  Persistent large-form operational context entered by the user.
-- `Content production`
-  Media intake, output-format selection, Field Mode generation, Desk Mode
-  handoff packaging, retry, export, and sharing.
-- `Settings`
-  Collaborator mode, processing location, on-device Gemma 4 E2B/E4B selection,
-  cloud Gemma 4 26B A4B/31B selection, model download/import status, and
-  Gemini API key storage.
-
-## Model Strategy
-
-The Apple app supports two collaborator modes:
-
-- Field Mode: generate here. Run Gemma 4 through the selected inference backend
-  and produce overlay media, post text, and a share package.
-- Desk Mode: generate later. Do not call Gemma 4 from the app. Package the raw
-  story, optional field-update details, media manifest, and unprocessed selected
-  media for a trusted recipient.
-
-Field Mode supports two inference modes.
-
-On-device mode:
-
-- local Gemma 4 E2B and E4B `.litertlm` files
-- LiteRT-LM Conversation JSON bridge
-- model discovery from `Application Support/Models`
-- model download from the pinned Hugging Face LiteRT community model revisions
-  into the app's on-device model folder
-- model import from Files into the same app-managed model folder
-- device injection through `apps/apple/scripts/shared/inject_models_to_device.sh`
-
-Cloud mode:
-
-- hosted Gemma 4 through the Gemini API REST `generateContent` endpoint
-- selectable cloud models:
-  - `gemma-4-26b-a4b-it`
-  - `gemma-4-31b-it`
-- API key entry in Settings, stored through the app key store
-- API keys are Gemini API keys, which Google currently creates and manages
-  through Google AI Studio or Google Cloud project credentials
-- image inputs are uploaded through the Gemini Files API and referenced from
-  `generateContent` as `fileData`; the app deletes uploaded files after each
-  production run and relies on Gemini's temporary file retention as a fallback
-- hosted calls use a field-mode request deadline, show the active production
-  stage, and include attempt counts and timeout reasons in Production errors
-- this is not Vertex AI and does not use OpenRouter-specific routing controls
-
-Pinned LiteRT-LM download URLs used by Settings and local testing:
-
-- E2B: `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/242c4cb1dc6392c4267c82793ab9a26d92732fbf/gemma-4-E2B-it.litertlm`
-- E4B: `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/afca9a55ba2848faee6588e46b47c3164411a903/gemma-4-E4B-it.litertlm`
-
-Reference model pages:
-
-- E2B: `https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm`
-- E4B: `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm`
-
-Large model files are intentionally kept out of this repository. On this
-workstation, existing test copies are stashed outside the repo under
-`~/dev/gemma4-tests*/.model-cache-stash/`.
-
-## Media and Overlay Workflow
-
-The production workflow exposes a small media-tool contract to Gemma:
-
-- `compose_visuals`
-- `add_text_overlay`
-- `move_text_overlay`
-- `accept_overlay_layout`
-
-The tool executor is implemented in Swift and renders locally with Apple
-frameworks. Images target a `1080 x 1350` canvas and reels target a
-`1080 x 1920` canvas.
-
-Overlay placement uses a model-driven correction pass after the first render.
-The correction prompt receives a single clean guide image made from the source
-image, a coordinate grid, and the current sticker outline; it does not receive
-the rendered sticker pixels. The correction tool requires exact `x`, `y`,
-`width`, and `height` slot coordinates, keeps a small edge margin, and asks the
-model to preserve safe side/corner placements instead of moving them for
-aesthetic churn. The same prompt/tool contract is mirrored across on-device
-LiteRT-LM, hosted Gemini API, and Relay Desk.
-
-Exports are written into the app's Documents area as an Aileen YAML package:
-
-- `aileen-job.yaml` with `aileen_job_version: 1`, `execution.mode:
-  field_completed` for Field Mode or `remote_generate` for Desk Mode
-- `media/` containing produced visual outputs in Field Mode, including rendered
-  overlays, or unprocessed selected media in Desk Mode
-
-Relay Desk consumes the same Desk Mode package plus the transferred media. For
-still images it runs Gemma 4 E4B in a Hugging Face ZeroGPU Gradio Space, renders
-the final story visual with Python image tooling, aspect-fills source stills to
-the same `1080 x 1350` image canvas used by Field Mode, generates the same post text
-stage as Field Mode, and exports a completed package containing
-`aileen-job.yaml` plus produced media under `media/`.
-
-Media `source_type` records the best pre-render provenance signal for the
-produced media. This is intentionally stored in YAML because adding overlays can
-invalidate embedded C2PA manifests, and downstream messaging or social apps may
-strip image metadata entirely. Photo-library image selections with
-camera-capture metadata are marked `field_photo`, file imports and photo-library
-items without camera metadata are marked `unknown`, and embedded C2PA/IPTC
-digital source type markers for generative AI promote the produced item to
-`synthetic_demo_image`. When the selected source media has one unambiguous GPS
-coordinate, that coordinate is also carried into the YAML media entry. A bare
-C2PA manifest is not treated as synthetic because authenticity cameras can also
-write C2PA credentials.
-
-Finished Field Mode and Relay Desk media whose rolled-up `source_type` is
-`synthetic_demo_image` also receive a small visible `AI` disclosure badge in the
-upper-left corner after the model-produced overlay is rendered. The badge is
-deterministic provenance UI rather than model-generated overlay copy, so it does
-not change the visual tool contract or compete for lower-frame caption space.
-
-Current `aileen-job.yaml` schema:
-
-```yaml
-aileen_job_version: 1
-execution:
-  mode: field_completed # or remote_generate
-story:
-  raw: |-
-    Original user story prompt.
-  post_body: |-
-    Generated Field Mode caption. Omitted in Desk Mode.
-field_update:
-  location_label: "Ningaloo coast"
-  update_time_local: "Apr 4, 2026 at 3:30 PM"
-  review_notes: |-
-    Keep public location broad; avoid exact rescue, private, supply, route,
-    and responder staging locations.
-media:
-  - id: media_001
-    filename: "media/media_001.jpg"
-    type: photo # or video
-    source_type: field_photo # field_photo, synthetic_demo_image, or unknown
-    captured_at: "2026-04-04T07:30:00Z"
-    gps:
-      latitude: -33.868800
-      longitude: 151.209300
-```
-
-Desk Mode packages are declarative job cards. They carry raw inputs, but
-intentionally omit generated post text and overlay-rendered media until a later
-Relay Desk workflow creates the finished post.
-
-Location and time are controlled from the app's optional details section. Update
-time defaults to image metadata when available. Location defaults to omitted;
-choosing image-derived location includes media GPS coordinates, while a manual
-location label does not include coordinates.
-
-When a package is exported from the app, `aileen-job.yaml` is also copied to the
-clipboard. On iOS the share sheet receives the media files, so a responder can
-choose a messenger app and paste the package text into the message body.
-
-Overlay placement remains active product work. The app now performs pre-analysis
-for protected regions and layout guidance, but prompt and tool-contract quality
-work is still tracked separately from the stability fixes.
-
-## Third-Party Runtime Policy
-
-This repository tries to keep third-party runtime provenance explicit.
-
-- Apple-side LiteRT artifacts live under `apps/apple/ThirdParty/GoogleAIEdge/`
-- each artifact folder carries an origin note
-- regeneration is handled by:
-  - `apps/apple/scripts/bootstrap_google_ai_edge_artifacts.sh`
-- device model injection is handled by:
-  - `apps/apple/scripts/shared/inject_models_to_device.sh`
-
-Prefer official platform frameworks, official Google-distributed artifacts, or
-reproducible generation from pinned upstream source over opaque local binaries.
-
-## Development
-
-Regenerate the Apple Xcode project:
 
 ```bash
 cd apps/apple
 ruby scripts/generate_xcodeproj.rb
 ```
 
-Build quietly for simulator:
+Do not make durable project-structure changes directly in
+`Aileen4DisasterRelief.xcodeproj/project.pbxproj`; update the generator and
+regenerate the project.
+
+Open the generated Xcode project:
+
+```bash
+open apps/apple/Aileen4DisasterRelief.xcodeproj
+```
+
+Build quietly from the command line:
 
 ```bash
 cd apps/apple
 scripts/build_apple_quiet.sh simulator
 ```
 
-Run the Relay Desk locally:
+Requirements and constraints:
+
+- Xcode with Swift 6 support.
+- iOS 17 deployment target.
+- Apple Silicon for simulator builds; the generated project excludes x86_64
+  simulator builds because the LiteRT artifacts are arm64-only.
+- The ignored Google AI Edge xcframeworks must exist under
+  `apps/apple/ThirdParty/GoogleAIEdge/` before building from a clean checkout.
+
+## Apple LiteRT-LM Runtime Artifacts
+
+The app links LiteRT-LM through an Objective-C++ bridge in
+`apps/apple/Aileen4DisasterRelief/Sources/LiteRTLMBridge/`. The generated Xcode
+project expects these local artifacts:
+
+- `apps/apple/ThirdParty/GoogleAIEdge/LiteRTLM.xcframework`
+- `apps/apple/ThirdParty/GoogleAIEdge/GemmaModelConstraintProvider.xcframework`
+- `apps/apple/ThirdParty/GoogleAIEdge/LiteRtMetalAccelerator.xcframework`
+
+These xcframeworks are intentionally ignored by Git because they are large
+generated/native artifacts. The tracked README in that directory records the
+expected provenance. After a clean checkout, restore them from an out-of-band
+demo artifact bundle if one was provided, or regenerate them from official
+Google AI Edge inputs:
+
+```bash
+cd apps/apple
+scripts/bootstrap_google_ai_edge_artifacts.sh \
+  /path/to/google-ai-edge-LiteRT-LM \
+  /path/to/google-ai-edge-LiteRT-prebuilts.zip
+```
+
+The first argument must be a LiteRT-LM checkout containing `c/engine.h`. The
+script requires `bazel` or `bazelisk` to build `LiteRTLM.xcframework`. On a
+fresh checkout, pass the LiteRT prebuilts zip as the second argument so the
+project's `LiteRtMetalAccelerator.xcframework` dependency is restored as well.
+
+The runtime currently defaults both LiteRT text and vision backends to CPU for
+stability. Debug and experiment overrides are available through environment
+variables such as `GEMMA_LITERT_TEXT_BACKEND`,
+`GEMMA_LITERT_VISION_BACKEND`, `GEMMA_LITERT_MAX_OUTPUT_TOKENS`, and
+`GEMMA_LITERT_MAX_NUM_TOKENS`.
+
+## On-Device Model Files
+
+Large `.litertlm` model files are not stored in this repository. The Apple app
+can get them in three ways:
+
+- Download pinned Gemma 4 E2B/E4B LiteRT-LM files from Settings.
+- Import a matching `.litertlm` file from Files.
+- Inject files into the app sandbox for development or preloaded devices.
+
+Device injection:
+
+```bash
+cd apps/apple
+xcrun devicectl list devices
+scripts/shared/inject_models_to_device.sh \
+  <device-id> \
+  de.ndurner.Aileen4DisasterRelief \
+  /path/to/gemma-4-E2B-it.litertlm \
+  /path/to/gemma-4-E4B-it.litertlm
+```
+
+The script copies models into `Library/Application Support/Models` inside the
+app container and reuses existing files when its generated manifest matches.
+
+## Cloud Gemma
+
+The Apple app's cloud path uses Gemini API keys and hosted Gemma 4 model IDs:
+
+- `gemma-4-26b-a4b-it`
+- `gemma-4-31b-it`
+
+Images are uploaded through the Gemini Files API and referenced from
+`generateContent` as `fileData`. The app deletes uploaded files after each
+production run and treats Gemini's temporary retention as a fallback.
+
+## Quick Start: Relay Desk
+
+Relay Desk lives in `services/relay-desk/` and is designed to be pushed to a
+Hugging Face Gradio Space using ZeroGPU hardware. A live demo currently [runs here](https://huggingface.co/spaces/ndurner/aileen-relay-desk).
+
+Run locally:
 
 ```bash
 cd services/relay-desk
@@ -299,101 +170,102 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Relay Desk is designed for a Hugging Face Gradio Space on ZeroGPU. It uses
-`google/gemma-4-E4B-it` through Transformers, renders the story image with
-Pillow, and does not call the Gemini API. Local Apple Silicon runs use PyTorch
-MPS automatically when available; set `AILEEN_RELAY_DEVICE=cpu`, `mps`, or
-`cuda` to override device selection. Relay enables Gemma thinking by default
-for production and batch runs, captures raw model responses and extracted
-thinking traces in the batch harness, and uses `AILEEN_RELAY_ENABLE_THINKING=0`
-only for no-thinking comparisons. Thinking runs default to a bounded
-`AILEEN_RELAY_MAX_NEW_TOKENS=1200` generation cap to keep local MPS runs stable;
-raise it only when diagnosing truncated thoughts or tool calls.
-The Apple LiteRT-LM bridge uses the same 1200-token output cap by default and
-an 8192-token engine budget so thinking-mode prompts have room for image/tool
-context before the model emits tool calls. Override with
-`GEMMA_LITERT_MAX_OUTPUT_TOKENS` or `GEMMA_LITERT_MAX_NUM_TOKENS` when running
-targeted experiments.
-
-Restore Google AI Edge artifacts after a fresh clone:
+Local execution uses the same Python code path as the Space and downloads
+`google/gemma-4-E4B-it` on first generation. On Apple Silicon, it selects MPS
+automatically when available; override with:
 
 ```bash
-cd apps/apple
-scripts/bootstrap_google_ai_edge_artifacts.sh /path/to/google-ai-edge-LiteRT-LM
+AILEEN_RELAY_DEVICE=cpu python app.py
 ```
 
-Inject on-device models onto a device:
+Valid `AILEEN_RELAY_DEVICE` values are `auto`, `mps`, `cuda`, and `cpu`.
+
+Run the batch harness without launching Gradio:
 
 ```bash
-cd apps/apple
-scripts/shared/inject_models_to_device.sh <device-id> <bundle-id> <model-path> [<model-path> ...]
+cd services/relay-desk
+python relay_batch.py \
+  --dataset /tmp/aileen-kaggle-datasets/overlay-placement-benchmark \
+  --out /tmp/aileen-relay-batch \
+  --limit 2
 ```
 
-Example using an existing local stash:
+Use `--dry-run` to validate dataset discovery without loading Gemma.
 
-```bash
-cd apps/apple
-xcrun devicectl list devices
-scripts/shared/inject_models_to_device.sh \
-  6E4F1B88-F27A-5989-888C-F1781C359B9B \
-  de.ndurner.Aileen4DisasterRelief \
-  ~/dev/gemma4-tests/.model-cache-stash/gemma-4-E2B-it.litertlm
+## Handoff Package
+
+Aileen packages are plain YAML so the operational context can travel separately
+from fragile image metadata:
+
+```yaml
+aileen_job_version: 1
+execution:
+  mode: remote_generate # or field_completed after generation
+story:
+  raw: |-
+    Field update written by the responder.
+field_update:
+  location_label: "Ningaloo coast"
+  update_time_local: "Apr 4, 2026 afternoon"
+  review_notes: |-
+    Keep public location broad; avoid exact rescue or staging locations.
+media:
+  - id: media_001
+    filename: "media/photo_001.jpg"
+    type: photo
+    source_type: field_photo # field_photo, synthetic_demo_image, or unknown
 ```
 
-Re-running the same command is cheap because the script compares a generated
-manifest and prints `Reusing injected ...` when nothing changed.
+Finished Field Mode and Relay Desk outputs write `execution.mode:
+field_completed`, add generated `story.post_body`, and point media entries at
+produced files under `media/`.
 
-For the Designed-for-iPad target on Mac, launch the app once from Xcode, then
-copy the model into the running app's active sandbox. Xcode-launched builds may
-use a UUID-named container, so read the process `HOME` instead of assuming a
-fixed container path:
+If media provenance rolls up to `synthetic_demo_image`, the renderer adds a
+small visible `AI` badge in the upper-left corner after the model-produced
+overlay is rendered.
 
-```bash
-APP_PID="$(ps aux | awk '/[A]ileen4DisasterRelief.app\/Aileen4DisasterRelief/{print $2; exit}')"
-APP_HOME="$(ps eww -p "$APP_PID" | tr ' ' '\n' | sed -n 's/^HOME=//p' | head -n1)"
+## Overlay Tool Contract
 
-mkdir -p "$APP_HOME/Library/Application Support/Models"
-cp ~/dev/gemma4-tests/.model-cache-stash/gemma-4-E2B-it.litertlm \
-  "$APP_HOME/Library/Application Support/Models/"
-```
+Gemma sees a small media-tool interface:
 
-Restart the app if it was already running so it re-reads the container contents.
+- `compose_visuals`
+- `add_text_overlay`
+- `move_text_overlay`
+- `accept_overlay_layout`
 
-The Settings screen can also download the pinned E2B and E4B LiteRT-LM files
-directly into the app-managed on-device model folder. Manual injection remains
-useful for offline testing, preloaded devices, and avoiding repeated multi-GB
-downloads during development.
+The model returns intent. The app or Relay Desk validates arguments, measures
+text, renders overlays, and feeds tool results back to the model. A correction
+turn reviews a clean source frame with grid and outline guides so the model can
+move an overlay away from people, animals, hands, equipment, and other
+story-critical content without editing source pixels directly.
 
-Run the overlay lab:
+This contract is intentionally kept in parity across:
 
-```bash
-apps/apple/overlay-lab/scripts/overlay_lab.sh analyze /tmp/insta-samples/*
-apps/apple/overlay-lab/scripts/run_gemma_overlay_lab.sh /tmp/test-imgs/*
-```
+- iOS on-device LiteRT-LM processing
+- iOS cloud Gemini API processing
+- Relay Desk Transformers processing
 
-Build the Kaggle-ready overlay-placement benchmark from the active synthetic
-fixtures:
+Relay Desk parity notes live in `services/relay-desk/PARITY.md`.
 
-```bash
-services/relay-desk/.venv/bin/python \
-  apps/apple/overlay-lab/scripts/build_kaggle_overlay_dataset.py \
-  --clean \
-  --dataset-id YOUR_KAGGLE_USERNAME/aileen-overlay-placement-benchmark
-```
+## Current Status
 
-The generated package is written under
-`/tmp/aileen-kaggle-datasets/overlay-placement-benchmark/` and contains Kaggle
-metadata, copied synthetic images/stories, control placements, benchmark
-configuration, and the Codex grading schema. The copied PNGs are dataset payload
-files; they are separate from Kaggle's optional `dataset-cover-image.*`
-metadata convention.
+Implemented:
 
-## Notes
+- Apple client for Field Mode and Desk Mode.
+- On-device Gemma 4 through LiteRT-LM.
+- Hosted Gemma 4 through the Gemini API.
+- Apple-native image and reel rendering with AVFoundation, CoreImage,
+  CoreGraphics, ImageIO, and UIKit.
+- Relay Desk Gradio app for still-image Desk Mode completion.
+- YAML package export/import for field handoffs.
+- Overlay lab and batch harnesses for placement-regression work.
 
-- This repository is structured as a real product workspace, not a single
-  sandbox app folder.
-- The Apple app and the future datacenter stack are expected to diverge in
-  runtime technology even if they share product concepts.
-- Keep experimental overlay work in `apps/apple/overlay-lab/` or
-  `apps/apple/Aileen4DisasterRelief/Sources/OverlayLab/`, not in the main app
-  flow unless it is intentionally productized.
+## Related Docs
+
+- `apps/apple/README.md`: Apple app setup and runtime notes.
+- `apps/apple/ThirdParty/GoogleAIEdge/README.md`: LiteRT-LM artifact
+  provenance and restore expectations.
+- `apps/apple/overlay-lab/README.md`: overlay experimentation workflow.
+- `services/relay-desk/README.md`: Hugging Face Space and local Relay Desk
+  setup.
+- `services/relay-desk/PARITY.md`: iOS/Relay Desk behavior contract.
