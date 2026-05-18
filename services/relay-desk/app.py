@@ -2114,7 +2114,7 @@ def run_post_body_workflow(package: dict[str, Any], assets: list[ProductionAsset
         {"role": "system", "content": POST_BODY_SYSTEM_INSTRUCTION},
         {"role": "user", "content": content},
     ]
-    raw = generate_raw(messages, max_new_tokens=min(MAX_NEW_TOKENS, 500))
+    raw = generate_raw(messages, max_new_tokens=MAX_NEW_TOKENS)
     return clean_plain_text_response(raw)
 
 
